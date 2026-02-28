@@ -1,0 +1,741 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0">
+<title>Raga Challenge</title>
+<link href="https://fonts.googleapis.com/css2?family=Google+Sans:wght@400;500;700&family=Google+Sans+Display&display=swap" rel="stylesheet">
+<style>
+*, *::before, *::after { box-sizing: border-box; margin: 0; padding: 0; }
+:root {
+  --gold: #F5C842; --red: #E63946;
+  --glass: rgba(255,255,255,0.08); --glass-border: rgba(255,255,255,0.18);
+  --font: 'Google Sans', 'Product Sans', sans-serif;
+}
+html, body {
+  width:100%; height:100%; background:#0d0d0d;
+  display:flex; align-items:center; justify-content:center;
+  font-family:var(--font); color:white; overflow:hidden;
+}
+#app {
+  width:min(390px,100vw); height:min(844px,100svh);
+  position:relative; overflow:hidden; background:#000;
+  border-radius:clamp(0px,3vw,40px);
+  box-shadow:0 0 0 2px #2a2a2a, 0 40px 80px rgba(0,0,0,0.9);
+}
+.screen { position:absolute; inset:0; display:none; flex-direction:column; align-items:center; justify-content:center; }
+.screen.active { display:flex; }
+
+/* ── SETUP ── */
+#setup-screen { background:radial-gradient(ellipse at 50% -10%,#2a1400 0%,#000 65%); padding:5% 8%; gap:0; }
+.mandala-bg {
+  position:absolute; inset:0; opacity:0.05; pointer-events:none;
+  background-image:url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' width='300' height='300'%3E%3Ccircle cx='150' cy='150' r='120' fill='none' stroke='%23F5C842' stroke-width='0.8'/%3E%3Ccircle cx='150' cy='150' r='90' fill='none' stroke='%23F5C842' stroke-width='0.8'/%3E%3Ccircle cx='150' cy='150' r='60' fill='none' stroke='%23F5C842' stroke-width='0.8'/%3E%3Ccircle cx='150' cy='150' r='30' fill='none' stroke='%23F5C842' stroke-width='0.8'/%3E%3Cline x1='150' y1='30' x2='150' y2='270' stroke='%23F5C842' stroke-width='0.4'/%3E%3Cline x1='30' y1='150' x2='270' y2='150' stroke='%23F5C842' stroke-width='0.4'/%3E%3Cline x1='65' y1='65' x2='235' y2='235' stroke='%23F5C842' stroke-width='0.4'/%3E%3Cline x1='235' y1='65' x2='65' y2='235' stroke='%23F5C842' stroke-width='0.4'/%3E%3C/svg%3E");
+  background-size:300px 300px;
+}
+.app-eyebrow { font-size:11px; letter-spacing:5px; color:var(--gold); text-transform:uppercase; margin-bottom:6px; position:relative; font-weight:500; }
+.app-title { font-size:clamp(34px,10vw,46px); line-height:1; text-align:center; color:white; position:relative; margin-bottom:4px; font-weight:700; }
+.app-subtitle { font-size:11px; color:rgba(255,255,255,0.35); letter-spacing:3px; text-transform:uppercase; margin-bottom:6%; position:relative; }
+.section-label { font-size:10px; letter-spacing:3px; text-transform:uppercase; color:var(--gold); margin-bottom:10px; align-self:flex-start; position:relative; z-index:2; font-weight:500; }
+.option-group { display:flex; gap:8px; width:100%; margin-bottom:5%; position:relative; }
+.opt-btn {
+  flex:1; padding:12px 6px; border:1px solid var(--glass-border); background:var(--glass);
+  color:rgba(255,255,255,0.55); border-radius:12px; cursor:pointer;
+  font-family:var(--font); font-size:14px; font-weight:500;
+  transition:all 0.2s; backdrop-filter:blur(10px); text-align:center; line-height:1.2; position:relative; z-index:2;
+}
+.opt-btn.selected { background:var(--gold); border-color:var(--gold); color:#000; }
+.opt-btn:hover:not(.selected) { border-color:rgba(255,255,255,0.4); color:white; }
+.diff-desc { font-size:10px; display:block; margin-top:3px; opacity:0.65; font-weight:400; }
+.start-btn {
+  width:100%; padding:5%; background:var(--gold); color:#000; border:none; border-radius:14px;
+  font-family:var(--font); font-size:18px; font-weight:700; cursor:pointer;
+  transition:transform 0.15s; box-shadow:0 8px 32px rgba(245,200,66,0.45); margin-top:2%; position:relative; z-index:2;
+}
+.start-btn:hover { transform:translateY(-2px); }
+
+/* ── PERMISSION ── */
+#perm-screen { background:#000; padding:8%; gap:5%; text-align:center; }
+.perm-icon { font-size:56px; }
+.perm-title { font-size:28px; font-weight:700; }
+.perm-sub { font-size:14px; color:rgba(255,255,255,0.45); line-height:1.6; }
+.perm-btn { width:100%; padding:5%; background:var(--gold); color:#000; border:none; border-radius:14px; font-family:var(--font); font-size:18px; font-weight:700; cursor:pointer; }
+
+/* ── PREVIEW SCREEN ── */
+#preview-screen { background:#000; }
+#preview-video { position:absolute; inset:0; width:100%; height:100%; object-fit:cover; transform:scaleX(-1); }
+#preview-overlay {
+  position:absolute; inset:0; z-index:5;
+  display:flex; flex-direction:column; align-items:center; justify-content:flex-end;
+  padding-bottom:10%;
+  background:linear-gradient(to top, rgba(0,0,0,0.85) 0%, rgba(0,0,0,0.1) 50%, transparent 100%);
+}
+.preview-hint {
+  font-size:12px; letter-spacing:3px; text-transform:uppercase;
+  color:rgba(255,255,255,0.45); margin-bottom:10px; font-weight:400;
+}
+.preview-title {
+  font-size:20px; font-weight:700; color:white;
+  margin-bottom:28px; text-align:center; line-height:1.3;
+  padding:0 10%;
+}
+.preview-settings {
+  display:flex; gap:10px; margin-bottom:28px;
+}
+.preview-pill {
+  font-size:11px; letter-spacing:2px; text-transform:uppercase;
+  padding:5px 14px; border-radius:20px;
+  border:1px solid var(--glass-border); background:var(--glass);
+  backdrop-filter:blur(8px); color:rgba(255,255,255,0.65); font-weight:500;
+}
+.preview-pill span { color:var(--gold); }
+#start-rec-btn {
+  width:80%; padding:5.5%; background:var(--red); color:white;
+  border:none; border-radius:60px; font-family:var(--font);
+  font-size:18px; font-weight:700; cursor:pointer;
+  box-shadow:0 0 0 0 rgba(230,57,70,0.5);
+  animation:pulse 2s infinite;
+  transition:transform 0.15s;
+}
+#start-rec-btn:active { transform:scale(0.96); animation:none; }
+@keyframes pulse {
+  0%   { box-shadow:0 0 0 0 rgba(230,57,70,0.6); }
+  70%  { box-shadow:0 0 0 18px rgba(230,57,70,0); }
+  100% { box-shadow:0 0 0 0 rgba(230,57,70,0); }
+}
+.preview-back {
+  margin-top:14px; background:transparent; border:none;
+  color:rgba(255,255,255,0.35); font-family:var(--font);
+  font-size:13px; font-weight:400; cursor:pointer;
+  letter-spacing:1px;
+}
+
+/* 3-2-1 Countdown overlay */
+#go-countdown {
+  position:absolute; inset:0; z-index:40;
+  display:none; align-items:center; justify-content:center;
+  background:rgba(0,0,0,0.5); backdrop-filter:blur(3px);
+}
+#go-countdown.active { display:flex; }
+#go-num {
+  font-size:clamp(100px,30vw,160px); font-weight:700; color:white;
+  animation:goNumPop 0.4s cubic-bezier(0.34,1.56,0.64,1);
+  text-shadow:0 0 60px rgba(245,200,66,0.6);
+  line-height:1;
+}
+#go-num.go-text { font-size:clamp(60px,18vw,100px); color:var(--gold); }
+@keyframes goNumPop {
+  0%   { transform:scale(0.3); opacity:0; }
+  100% { transform:scale(1); opacity:1; }
+}
+
+/* ── CAMERA SCREEN ── */
+#camera-screen { background:#000; }
+#video-bg { position:absolute; inset:0; width:100%; height:100%; object-fit:cover; transform:scaleX(-1); }
+.cam-overlay-top { position:absolute; top:0; left:0; right:0; height:25%; background:linear-gradient(to bottom,rgba(0,0,0,0.8) 0%,transparent 100%); pointer-events:none; }
+.cam-overlay-bottom { position:absolute; bottom:0; left:0; right:0; height:35%; background:linear-gradient(to top,rgba(0,0,0,0.88) 0%,transparent 100%); pointer-events:none; }
+#top-bar { position:absolute; top:0; left:0; right:0; padding:6% 7% 0; display:flex; align-items:center; justify-content:space-between; z-index:10; }
+.raga-counter { font-size:13px; letter-spacing:1px; color:rgba(255,255,255,0.75); font-weight:500; }
+.difficulty-badge { font-size:10px; letter-spacing:2px; text-transform:uppercase; padding:4px 12px; border-radius:20px; border:1px solid var(--glass-border); background:var(--glass); backdrop-filter:blur(8px); color:var(--gold); font-weight:500; }
+#rec-badge { position:absolute; top:6%; left:50%; transform:translateX(-50%); display:flex; align-items:center; gap:6px; font-size:11px; letter-spacing:2px; color:var(--red); opacity:0; transition:opacity 0.3s; font-weight:500; }
+#rec-badge.visible { opacity:1; }
+.rec-dot { width:7px; height:7px; border-radius:50%; background:var(--red); animation:blink 1s infinite; }
+@keyframes blink { 0%,100%{opacity:1} 50%{opacity:0.1} }
+
+/* ── SLOT MACHINE ── */
+#slot-wrap {
+  position:absolute; inset:0; z-index:20;
+  background:rgba(0,0,0,0.65); backdrop-filter:blur(8px);
+  display:none; flex-direction:column; align-items:center; justify-content:center;
+}
+#slot-wrap.active { display:flex; }
+#slot-window { width:88%; height:192px; overflow:hidden; position:relative; display:flex; align-items:center; justify-content:center; }
+#slot-window::before,#slot-window::after { content:''; position:absolute; left:0; right:0; height:36%; z-index:2; pointer-events:none; }
+#slot-window::before { top:0; background:linear-gradient(to bottom,rgba(0,0,0,0.95),transparent); }
+#slot-window::after  { bottom:0; background:linear-gradient(to top,rgba(0,0,0,0.95),transparent); }
+.sel-line { position:absolute; left:0; right:0; height:2px; background:var(--gold); z-index:3; box-shadow:0 0 16px var(--gold),0 0 40px rgba(245,200,66,0.4); }
+.sel-line.top { top:32%; }
+.sel-line.bot { bottom:32%; }
+#slot-inner { display:flex; flex-direction:column; align-items:center; will-change:transform; }
+.slot-item { font-family:var(--font); font-weight:700; font-size:clamp(22px,6.5vw,34px); height:64px; line-height:64px; text-align:center; white-space:nowrap; padding:0 20px; color:rgba(255,255,255,0.22); }
+.slot-item.center { color:white; text-shadow:0 0 30px rgba(245,200,66,0.7); }
+.slot-hint { margin-top:18px; font-size:11px; letter-spacing:3px; color:rgba(255,255,255,0.45); text-transform:uppercase; font-weight:400; }
+
+/* ── RAGA DISPLAY ── */
+#raga-display { position:absolute; left:0; right:0; top:42%; transform:translateY(-50%); display:flex; flex-direction:column; align-items:center; pointer-events:none; z-index:5; opacity:0; transition:opacity 0.4s; }
+#raga-display.visible { opacity:1; }
+#raga-label { font-size:10px; letter-spacing:4px; text-transform:uppercase; color:rgba(255,255,255,0.4); margin-bottom:8px; }
+#raga-name { font-size:clamp(36px,11vw,58px); line-height:1; text-align:center; color:white; text-shadow:0 4px 40px rgba(0,0,0,0.9); padding:0 5%; font-weight:700; }
+#raga-name.reveal { animation:ragaReveal 0.7s cubic-bezier(0.34,1.56,0.64,1); }
+@keyframes ragaReveal { 0%{transform:scale(0.4) translateY(30px);opacity:0;filter:blur(12px)} 100%{transform:scale(1) translateY(0);opacity:1;filter:blur(0)} }
+
+/* countdown ring */
+#countdown-wrap { position:absolute; bottom:13%; left:50%; transform:translateX(-50%); z-index:5; }
+.ring-container { position:relative; width:clamp(72px,22vw,96px); height:clamp(72px,22vw,96px); }
+#ring-svg { width:100%; height:100%; transform:rotate(-90deg); }
+#ring-bg  { fill:none; stroke:rgba(255,255,255,0.1); stroke-width:4; }
+#ring-progress { fill:none; stroke:var(--gold); stroke-width:4; stroke-linecap:round; transition:stroke-dashoffset 0.15s linear; }
+#countdown-num { position:absolute; inset:0; display:flex; align-items:center; justify-content:center; font-size:clamp(24px,8vw,34px); font-weight:700; }
+
+/* particles */
+#reveal-particles { position:absolute; inset:0; pointer-events:none; overflow:hidden; z-index:6; }
+.particle { position:absolute; width:5px; height:5px; border-radius:50%; animation:pBurst 0.9s ease-out forwards; }
+@keyframes pBurst { 0%{transform:translate(0,0) scale(1);opacity:1} 100%{transform:translate(var(--tx),var(--ty)) scale(0);opacity:0} }
+
+/* bottom controls */
+#bottom-controls { position:absolute; bottom:4%; left:0; right:0; display:flex; gap:4%; padding:0 7%; z-index:10; }
+.ctrl-btn { flex:1; padding:4.5% 0; border-radius:12px; border:1px solid var(--glass-border); background:var(--glass); color:white; font-family:var(--font); font-size:15px; font-weight:600; cursor:pointer; backdrop-filter:blur(12px); transition:all 0.2s; }
+.ctrl-btn.primary { background:var(--red); border-color:var(--red); box-shadow:0 4px 20px rgba(230,57,70,0.5); }
+.ctrl-btn:active { transform:scale(0.96); }
+#flash { position:absolute; inset:0; background:white; opacity:0; pointer-events:none; z-index:30; }
+#flash.on { opacity:0.2; }
+
+/* ── DONE SCREEN ── */
+#done-screen { background:radial-gradient(ellipse at 50% 20%,#1a1000 0%,#000 70%); padding:8%; gap:4%; text-align:center; }
+.done-icon { font-size:clamp(48px,14vw,68px); animation:popIn 0.7s cubic-bezier(0.34,1.56,0.64,1); }
+@keyframes popIn { 0%{transform:scale(0);opacity:0} 100%{transform:scale(1);opacity:1} }
+.done-title { font-size:clamp(28px,8vw,40px); color:var(--gold); font-weight:700; }
+.done-sub { font-size:14px; color:rgba(255,255,255,0.45); line-height:1.7; }
+.done-stats { display:flex; gap:3%; width:100%; }
+.stat-box { flex:1; padding:5% 4%; border:1px solid var(--glass-border); border-radius:14px; background:var(--glass); }
+.stat-num { font-size:clamp(22px,7vw,30px); color:var(--gold); font-weight:700; }
+.stat-label { font-size:10px; color:rgba(255,255,255,0.35); text-transform:uppercase; letter-spacing:1px; margin-top:4px; }
+.download-btn { width:100%; padding:5%; background:var(--gold); color:#000; border:none; border-radius:14px; font-family:var(--font); font-size:18px; font-weight:700; cursor:pointer; box-shadow:0 8px 32px rgba(245,200,66,0.45); transition:transform 0.15s,opacity 0.2s; }
+.download-btn:hover:not(:disabled) { transform:translateY(-2px); }
+.download-btn:disabled { opacity:0.5; cursor:not-allowed; }
+.restart-btn { background:transparent; border:1px solid var(--glass-border); color:rgba(255,255,255,0.45); padding:4%; border-radius:12px; width:100%; font-family:var(--font); font-size:14px; font-weight:500; cursor:pointer; transition:all 0.2s; }
+.restart-btn:hover { border-color:white; color:white; }
+#conv-overlay { display:none; position:absolute; inset:0; background:rgba(0,0,0,0.92); flex-direction:column; align-items:center; justify-content:center; gap:14px; z-index:50; padding:10%; text-align:center; }
+#conv-overlay.active { display:flex; }
+.conv-title { font-size:22px; font-weight:700; color:var(--gold); }
+.conv-sub   { font-size:13px; color:rgba(255,255,255,0.5); }
+.conv-track { width:80%; height:4px; background:rgba(255,255,255,0.1); border-radius:4px; overflow:hidden; }
+.conv-fill  { height:100%; background:var(--gold); width:0%; transition:width 0.4s; border-radius:4px; }
+</style>
+</head>
+<body>
+<div id="app">
+
+  <!-- SETUP -->
+  <div id="setup-screen" class="screen active">
+    <div class="mandala-bg"></div>
+    <div class="app-eyebrow">Carnatic</div>
+    <div class="app-title">Raga<br>Challenge</div>
+    <div class="app-subtitle">Improvise · Record · Share</div>
+    <div class="section-label">Difficulty</div>
+    <div class="option-group" id="diff-group">
+      <button class="opt-btn selected" data-key="difficulty" data-val="easy" onclick="selectOpt(this,'diff-group')">Easy<span class="diff-desc">Popular ragas</span></button>
+      <button class="opt-btn" data-key="difficulty" data-val="medium" onclick="selectOpt(this,'diff-group')">Medium<span class="diff-desc">Similar pairs</span></button>
+      <button class="opt-btn" data-key="difficulty" data-val="hard" onclick="selectOpt(this,'diff-group')">Hard<span class="diff-desc">Rare &amp; tricky</span></button>
+    </div>
+    <div class="section-label">Seconds per Raga</div>
+    <div class="option-group" id="time-group">
+      <button class="opt-btn" data-key="timePerRaga" data-val="5" onclick="selectOpt(this,'time-group')">5s</button>
+      <button class="opt-btn selected" data-key="timePerRaga" data-val="8" onclick="selectOpt(this,'time-group')">8s</button>
+      <button class="opt-btn" data-key="timePerRaga" data-val="10" onclick="selectOpt(this,'time-group')">10s</button>
+    </div>
+    <div class="section-label">Number of Ragas</div>
+    <div class="option-group" id="count-group">
+      <button class="opt-btn" data-key="ragaCount" data-val="5" onclick="selectOpt(this,'count-group')">5</button>
+      <button class="opt-btn selected" data-key="ragaCount" data-val="10" onclick="selectOpt(this,'count-group')">10</button>
+      <button class="opt-btn" data-key="ragaCount" data-val="20" onclick="selectOpt(this,'count-group')">20</button>
+    </div>
+    <button class="start-btn" onclick="requestCamera()">Begin Challenge →</button>
+  </div>
+
+  <!-- PERMISSION -->
+  <div id="perm-screen" class="screen">
+    <div class="perm-icon">🎙️</div>
+    <div class="perm-title">Camera Access</div>
+    <div class="perm-sub">Your camera records the full challenge with overlays baked in — ready to post on Reels.</div>
+    <button class="perm-btn" onclick="startCamera()">Allow Camera</button>
+  </div>
+
+  <!-- PREVIEW -->
+  <div id="preview-screen" class="screen">
+    <video id="preview-video" autoplay muted playsinline></video>
+    <div id="preview-overlay">
+      <div class="preview-hint">You're all set</div>
+      <div class="preview-title">Position yourself,<br>then hit record when ready.</div>
+      <div class="preview-settings">
+        <div class="preview-pill" id="prev-diff">Easy</div>
+        <div class="preview-pill" id="prev-time">8s / raga</div>
+        <div class="preview-pill" id="prev-count">10 ragas</div>
+      </div>
+      <button id="start-rec-btn" onclick="beginCountdown()">&#9210; Start Recording</button>
+      <button class="preview-back" onclick="goBack()">&#8592; Change settings</button>
+    </div>
+    <div id="go-countdown">
+      <div id="go-num">3</div>
+    </div>
+  </div>
+
+  <!-- CHALLENGE -->
+  <div id="camera-screen" class="screen">
+    <video id="video-bg" autoplay muted playsinline></video>
+    <div class="cam-overlay-top"></div>
+    <div class="cam-overlay-bottom"></div>
+    <div id="slot-wrap">
+      <div id="slot-window">
+        <div class="sel-line top"></div>
+        <div class="sel-line bot"></div>
+        <div id="slot-inner"></div>
+      </div>
+      <div class="slot-hint">Picking your Raga…</div>
+    </div>
+    <div id="raga-display">
+      <div id="raga-label">Now Sing</div>
+      <div id="raga-name">—</div>
+    </div>
+    <div id="reveal-particles"></div>
+    <div id="top-bar">
+      <div class="raga-counter" id="raga-counter">0 / 10</div>
+      <div id="rec-badge"><div class="rec-dot"></div>REC</div>
+      <div class="difficulty-badge" id="diff-badge">Easy</div>
+    </div>
+    <div id="countdown-wrap">
+      <div class="ring-container">
+        <svg id="ring-svg" viewBox="0 0 100 100">
+          <circle id="ring-bg" cx="50" cy="50" r="44"/>
+          <circle id="ring-progress" cx="50" cy="50" r="44"/>
+        </svg>
+        <div id="countdown-num">—</div>
+      </div>
+    </div>
+    <div id="bottom-controls">
+      <button class="ctrl-btn primary" onclick="stopChallenge()">End Challenge</button>
+    </div>
+    <div id="flash"></div>
+  </div>
+
+  <!-- DONE -->
+  <div id="done-screen" class="screen">
+    <div id="conv-overlay">
+      <div class="conv-title">Converting to MP4…</div>
+      <div class="conv-sub" id="conv-sub">Loading converter…</div>
+      <div class="conv-track"><div class="conv-fill" id="conv-fill"></div></div>
+    </div>
+    <div class="done-icon">🎶</div>
+    <div class="done-title">Incredible!</div>
+    <div class="done-sub">Your Raga Challenge is complete.<br>Video is ready to share.</div>
+    <div class="done-stats">
+      <div class="stat-box"><div class="stat-num" id="stat-ragas">0</div><div class="stat-label">Ragas</div></div>
+      <div class="stat-box"><div class="stat-num" id="stat-time">0s</div><div class="stat-label">Duration</div></div>
+      <div class="stat-box"><div class="stat-num" id="stat-diff">—</div><div class="stat-label">Level</div></div>
+    </div>
+    <button class="download-btn" id="dl-btn" onclick="downloadVideo()" disabled>⏳ Preparing…</button>
+    <button class="restart-btn" onclick="restart()">New Challenge</button>
+  </div>
+
+</div>
+<script>
+const RAGAS = {
+  easy:['Shankarabharanam','Kalyani','Bhairavi','Todi','Kambhoji','Mohanam','Bilahari','Hindolam','Hamsadhwani','Revati','Natabhairavi','Charukesi','Kharaharapriya','Harikambhoji','Mayamalavagowla','Begada','Sahana','Suddha Dhanyasi','Punnagavarali','Anandabhairavi'],
+  medium:['Saveri','Pantuvarali','Suddha Saveri','Shanmukhapriya','Vachaspati','Kamavardhini','Latangi','Nattai','Varali','Navarasapriya','Hemavathi','Dharmavathi','Gaurimanohari','Simhendramadhyama','Sriranjani','Devagandhari','Kedaragowla','Kalavathi','Amritavarshini','Suddha Todi'],
+  hard:['Naganandini','Chitrambari','Ramapriya','Dhavalambari','Nasikabhushani','Kosalam','Rishabhapriya','Jhalavarali','Visvambhari','Sucharitra','Raghupriya','Gavambhodhi','Pavani','Shadvidhamargini','Salagam','Vagadhisvari','Supradeepam','Jyotisvarupini','Hatakambari','Kantamani']
+};
+
+let difficulty='easy', timePerRaga=8, ragaCount=10;
+let currentIdx=0, ragaList=[], cdInterval=null, secondsLeft=0;
+let mediaStream=null, mediaRecorder=null, chunks=[];
+let isRecording=false, startTime=null;
+let recCanvas=null, recCtx=null, drawRunning=false;
+let finalBlob=null, mp4Blob=null;
+
+const CIRC = 2*Math.PI*44;
+document.getElementById('ring-progress').style.strokeDasharray = CIRC;
+
+function selectOpt(btn, groupId) {
+  document.querySelectorAll('#'+groupId+' .opt-btn').forEach(b=>b.classList.remove('selected'));
+  btn.classList.add('selected');
+  const k=btn.dataset.key, v=btn.dataset.val;
+  if(k==='difficulty') difficulty=v;
+  if(k==='timePerRaga') timePerRaga=parseInt(v);
+  if(k==='ragaCount') ragaCount=parseInt(v);
+}
+
+function requestCamera(){ showScreen('perm-screen'); }
+
+async function startCamera(){
+  const btn=document.querySelector('.perm-btn');
+  btn.textContent='Starting…'; btn.disabled=true;
+  const tries=[{video:{facingMode:'user'},audio:true},{video:{facingMode:'user'},audio:false},{video:true,audio:false}];
+  for(const c of tries){ try{ mediaStream=await navigator.mediaDevices.getUserMedia(c); break; }catch(e){ mediaStream=null; } }
+  if(!mediaStream){ btn.textContent='Allow Camera'; btn.disabled=false; alert('Camera access failed.\n\nPlease:\n• Use Chrome or Safari\n• Allow camera permission\n• Ensure no other app uses camera'); return; }
+
+  // Feed same stream into both preview-video and video-bg
+  const previewVideo=document.getElementById('preview-video');
+  const challengeVideo=document.getElementById('video-bg');
+  previewVideo.srcObject=mediaStream;
+  challengeVideo.srcObject=mediaStream;
+
+  await new Promise(res=>{ previewVideo.onloadedmetadata=res; setTimeout(res,2500); });
+  try{ await previewVideo.play(); }catch(e){}
+  try{ await challengeVideo.play(); }catch(e){}
+
+  // Update preview pills
+  document.getElementById('prev-diff').textContent=difficulty[0].toUpperCase()+difficulty.slice(1);
+  document.getElementById('prev-time').textContent=timePerRaga+'s / raga';
+  document.getElementById('prev-count').textContent=ragaCount+' ragas';
+
+  showScreen('preview-screen');
+  btn.textContent='Allow Camera'; btn.disabled=false;
+}
+
+function goBack(){
+  // Stop stream and go back to setup
+  if(mediaStream){ mediaStream.getTracks().forEach(t=>t.stop()); mediaStream=null; }
+  showScreen('setup-screen');
+}
+
+function beginCountdown(){
+  const btn=document.getElementById('start-rec-btn');
+  btn.disabled=true;
+  const overlay=document.getElementById('go-countdown');
+  const numEl=document.getElementById('go-num');
+  overlay.classList.add('active');
+
+  const steps=['3','2','1','GO!'];
+  let i=0;
+
+  function tick(){
+    numEl.textContent=steps[i];
+    numEl.classList.toggle('go-text', steps[i]==='GO!');
+    // Retrigger animation
+    numEl.style.animation='none';
+    void numEl.offsetWidth;
+    numEl.style.animation='';
+
+    if(i===steps.length-1){
+      // On GO — start recording then launch challenge after brief moment
+      setTimeout(()=>{
+        overlay.classList.remove('active');
+        // Switch to challenge screen
+        showScreen('camera-screen');
+        document.getElementById('diff-badge').textContent=difficulty[0].toUpperCase()+difficulty.slice(1);
+        document.getElementById('raga-counter').textContent='0 / '+ragaCount;
+        // Start recording immediately
+        startRecording();
+        // Start challenge
+        setupChallenge();
+        btn.disabled=false;
+      }, 500);
+      return;
+    }
+    i++;
+    setTimeout(tick, 900);
+  }
+  tick();
+}
+
+function setupChallenge(){
+  const pool=[...RAGAS[difficulty]];
+  for(let i=pool.length-1;i>0;i--){ const j=Math.floor(Math.random()*(i+1));[pool[i],pool[j]]=[pool[j],pool[i]]; }
+  ragaList=pool.slice(0,ragaCount); currentIdx=0;
+  document.getElementById('raga-display').classList.remove('visible');
+  document.getElementById('raga-name').textContent='—';
+  document.getElementById('countdown-num').textContent='—';
+  document.getElementById('ring-progress').style.strokeDashoffset=0;
+  setTimeout(revealRaga,700);
+}
+
+function revealRaga(){
+  if(currentIdx>=ragaList.length){ endChallenge(); return; }
+  const raga=ragaList[currentIdx++];
+  document.getElementById('raga-counter').textContent=currentIdx+' / '+ragaCount;
+  const fl=document.getElementById('flash'); fl.classList.add('on'); setTimeout(()=>fl.classList.remove('on'),100);
+  document.getElementById('raga-display').classList.remove('visible');
+  clearInterval(cdInterval);
+  document.getElementById('countdown-num').textContent='—';
+  document.getElementById('ring-progress').style.strokeDashoffset=0;
+  runSlotMachine(raga,()=>{
+    const n=document.getElementById('raga-name');
+    n.textContent=raga; n.classList.remove('reveal'); void n.offsetWidth; n.classList.add('reveal');
+    document.getElementById('raga-display').classList.add('visible');
+    spawnParticles(); startCountdown();
+  });
+}
+
+function runSlotMachine(target, onDone){
+  const wrap=document.getElementById('slot-wrap');
+  const inner=document.getElementById('slot-inner');
+  const pool=RAGAS[difficulty];
+  const items=[];
+  for(let i=0;i<26;i++) items.push(pool[Math.floor(Math.random()*pool.length)]);
+  items.push(target);
+  const ITEM_H=64;
+  inner.innerHTML=items.map(n=>'<div class="slot-item">'+n+'</div>').join('');
+  wrap.classList.add('active');
+  const finalY=-(items.length-1)*ITEM_H;
+  let currentY=0, speed=ITEM_H*0.55;
+  const MIN=1.0, SLOW_ZONE=ITEM_H*7;
+  function tick(){
+    const dist=Math.abs(finalY-currentY);
+    if(dist<SLOW_ZONE) speed=Math.max(MIN,(dist/SLOW_ZONE)*ITEM_H*0.5);
+    currentY=Math.max(currentY-speed,finalY);
+    inner.style.transform='translateY('+currentY+'px)';
+    const ci=Math.round(Math.abs(currentY)/ITEM_H);
+    inner.querySelectorAll('.slot-item').forEach((el,i)=>el.classList.toggle('center',i===ci));
+    if(currentY<=finalY){ setTimeout(()=>{ wrap.classList.remove('active'); onDone(); },700); return; }
+    requestAnimationFrame(tick);
+  }
+  requestAnimationFrame(tick);
+}
+
+function startCountdown(){
+  clearInterval(cdInterval); secondsLeft=timePerRaga;
+  updateRing(secondsLeft); document.getElementById('countdown-num').textContent=secondsLeft;
+  cdInterval=setInterval(()=>{
+    secondsLeft--; updateRing(secondsLeft);
+    document.getElementById('countdown-num').textContent=Math.max(0,secondsLeft);
+    if(secondsLeft<=0){ clearInterval(cdInterval); revealRaga(); }
+  },1000);
+}
+
+function updateRing(s){
+  const f=Math.max(0,s/timePerRaga);
+  document.getElementById('ring-progress').style.strokeDashoffset=CIRC*(1-f);
+  const r=Math.round(245+(230-245)*(1-f)), g=Math.round(200+(57-200)*(1-f)), b=Math.round(66+(70-66)*(1-f));
+  document.getElementById('ring-progress').style.stroke='rgb('+r+','+g+','+b+')';
+}
+
+function spawnParticles(){
+  const c=document.getElementById('reveal-particles'); c.innerHTML='';
+  const app=document.getElementById('app');
+  const cx=app.offsetWidth/2, cy=app.offsetHeight*0.42;
+  for(let i=0;i<22;i++){
+    const p=document.createElement('div'); p.className='particle';
+    const angle=(i/22)*Math.PI*2, dist=50+Math.random()*100;
+    p.style.left=cx+'px'; p.style.top=cy+'px';
+    p.style.setProperty('--tx',Math.cos(angle)*dist+'px');
+    p.style.setProperty('--ty',Math.sin(angle)*dist+'px');
+    p.style.background=Math.random()>0.5?'#F5C842':'#E63946';
+    c.appendChild(p);
+  }
+}
+
+function startRecording(){
+  if(!mediaStream) return;
+  chunks=[];
+  const app=document.getElementById('app');
+  const video=document.getElementById('video-bg');
+  // Use actual app dimensions so canvas exactly matches what user sees
+  const W=app.offsetWidth, H=app.offsetHeight;
+  recCanvas=document.createElement('canvas');
+  recCanvas.width=W; recCanvas.height=H;
+  recCtx=recCanvas.getContext('2d');
+  const cs=recCanvas.captureStream(30);
+  mediaStream.getAudioTracks().forEach(t=>cs.addTrack(t));
+  const mimes=['video/webm;codecs=vp9,opus','video/webm;codecs=vp8,opus','video/webm'];
+  const mime=mimes.find(m=>MediaRecorder.isTypeSupported(m))||'video/webm';
+  mediaRecorder=new MediaRecorder(cs,{mimeType:mime,videoBitsPerSecond:6000000});
+  mediaRecorder.ondataavailable=e=>{ if(e.data.size>0) chunks.push(e.data); };
+  isRecording=true; drawRunning=true;
+  mediaRecorder.start(100); startTime=Date.now();
+  drawLoop(video,W,H);
+  document.getElementById('rec-badge').classList.add('visible');
+}
+
+function drawLoop(video,W,H){
+  if(!drawRunning) return;
+  const ctx=recCtx;
+
+  // ── Video: fill canvas preserving aspect ratio (cover) ──
+  // The browser renders the video with object-fit:cover + scaleX(-1)
+  // We replicate this exactly on canvas
+  const vw=video.videoWidth||W, vh=video.videoHeight||H;
+  const scale=Math.max(W/vw, H/vh);
+  const sw=vw*scale, sh=vh*scale;
+  const ox=(W-sw)/2, oy=(H-sh)/2;
+  ctx.save();
+  ctx.translate(W,0); ctx.scale(-1,1);
+  ctx.drawImage(video,ox,oy,sw,sh);
+  ctx.restore();
+
+  // ── Gradient overlays ──
+  let g=ctx.createLinearGradient(0,0,0,H*0.26);
+  g.addColorStop(0,'rgba(0,0,0,0.8)'); g.addColorStop(1,'rgba(0,0,0,0)');
+  ctx.fillStyle=g; ctx.fillRect(0,0,W,H*0.26);
+  g=ctx.createLinearGradient(0,H*0.64,0,H);
+  g.addColorStop(0,'rgba(0,0,0,0)'); g.addColorStop(1,'rgba(0,0,0,0.88)');
+  ctx.fillStyle=g; ctx.fillRect(0,H*0.64,W,H*0.36);
+
+  const topY=H*0.1;
+  const fs=s=>Math.round(W*s);
+
+  // ── Counter ──
+  ctx.font='500 '+fs(0.034)+'px "Google Sans",sans-serif';
+  ctx.fillStyle='rgba(255,255,255,0.75)'; ctx.textAlign='left';
+  ctx.fillText(document.getElementById('raga-counter').textContent, W*0.07, topY);
+
+  // ── Difficulty ──
+  ctx.font='500 '+fs(0.028)+'px "Google Sans",sans-serif';
+  ctx.fillStyle='#F5C842'; ctx.textAlign='right';
+  ctx.fillText(difficulty.toUpperCase(), W*0.93, topY);
+
+  // ── REC dot + label ──
+  ctx.fillStyle='#E63946';
+  ctx.beginPath(); ctx.arc(W/2-W*0.06,topY-4,W*0.018,0,Math.PI*2); ctx.fill();
+  ctx.font='500 '+fs(0.028)+'px "Google Sans",sans-serif';
+  ctx.textAlign='center';
+  ctx.fillText('REC',W/2+W*0.028,topY);
+
+  // ── Slot machine (when active) ──
+  const slotWrap=document.getElementById('slot-wrap');
+  if(slotWrap.classList.contains('active')){
+    ctx.fillStyle='rgba(0,0,0,0.65)'; ctx.fillRect(0,0,W,H);
+    const inner=document.getElementById('slot-inner');
+    const mat=new DOMMatrix(window.getComputedStyle(inner).transform);
+    const ty=mat.m42;
+    const wH=192, wY=(H-wH)/2, IH=64;
+    const fsize=fs(0.082);
+    ctx.font='700 '+fsize+'px "Google Sans",sans-serif';
+    ctx.textAlign='center';
+    inner.querySelectorAll('.slot-item').forEach((el,i)=>{
+      const iy=wY+i*IH+ty, cy2=iy+IH/2;
+      if(cy2<wY-IH||cy2>wY+wH+IH) return;
+      ctx.fillStyle=el.classList.contains('center')?'white':'rgba(255,255,255,0.2)';
+      if(el.classList.contains('center')){ ctx.shadowColor='rgba(245,200,66,0.7)'; ctx.shadowBlur=20; }
+      ctx.fillText(el.textContent,W/2,cy2+fsize*0.36);
+      ctx.shadowBlur=0;
+    });
+    // Gold lines
+    const l1=wY+wH*0.32, l2=wY+wH*0.68;
+    ctx.strokeStyle='#F5C842'; ctx.lineWidth=2;
+    ctx.shadowColor='#F5C842'; ctx.shadowBlur=14;
+    ctx.beginPath(); ctx.moveTo(W*0.05,l1); ctx.lineTo(W*0.95,l1); ctx.stroke();
+    ctx.beginPath(); ctx.moveTo(W*0.05,l2); ctx.lineTo(W*0.95,l2); ctx.stroke();
+    ctx.shadowBlur=0;
+    // Fades
+    let gf=ctx.createLinearGradient(0,wY,0,wY+wH*0.38);
+    gf.addColorStop(0,'rgba(0,0,0,0.95)'); gf.addColorStop(1,'rgba(0,0,0,0)');
+    ctx.fillStyle=gf; ctx.fillRect(0,wY,W,wH*0.38);
+    gf=ctx.createLinearGradient(0,wY+wH*0.62,0,wY+wH);
+    gf.addColorStop(0,'rgba(0,0,0,0)'); gf.addColorStop(1,'rgba(0,0,0,0.95)');
+    ctx.fillStyle=gf; ctx.fillRect(0,wY+wH*0.62,W,wH*0.38);
+    ctx.font='400 '+fs(0.027)+'px "Google Sans",sans-serif';
+    ctx.fillStyle='rgba(255,255,255,0.4)'; ctx.textAlign='center';
+    ctx.fillText('PICKING YOUR RAGA…',W/2,wY+wH+28);
+  } else {
+    // ── Raga name ──
+    const rd=document.getElementById('raga-display');
+    if(rd.classList.contains('visible')){
+      const name=document.getElementById('raga-name').textContent;
+      if(name&&name!=='—'){
+        ctx.font='400 '+fs(0.026)+'px "Google Sans",sans-serif';
+        ctx.fillStyle='rgba(255,255,255,0.38)'; ctx.textAlign='center';
+        ctx.fillText('NOW SING',W/2,H*0.42-H*0.045);
+        ctx.font='700 '+fs(0.13)+'px "Google Sans",sans-serif';
+        ctx.fillStyle='white'; ctx.textAlign='center';
+        ctx.shadowColor='rgba(0,0,0,0.9)'; ctx.shadowBlur=28;
+        ctx.fillText(name,W/2,H*0.46);
+        ctx.shadowBlur=0;
+      }
+    }
+  }
+
+  // ── Countdown ring on canvas ──
+  const rCX=W/2, rCY=H*0.87, rR=W*0.115;
+  const frac=Math.max(0,secondsLeft/timePerRaga);
+  ctx.beginPath(); ctx.arc(rCX,rCY,rR,0,Math.PI*2);
+  ctx.strokeStyle='rgba(255,255,255,0.1)'; ctx.lineWidth=3; ctx.stroke();
+  if(secondsLeft>0&&frac>0){
+    const r2=Math.round(245+(230-245)*(1-frac)), g2=Math.round(200+(57-200)*(1-frac)), b2=Math.round(66+(70-66)*(1-frac));
+    ctx.beginPath(); ctx.arc(rCX,rCY,rR,-Math.PI/2,-Math.PI/2+Math.PI*2*frac);
+    ctx.strokeStyle='rgb('+r2+','+g2+','+b2+')'; ctx.lineWidth=3; ctx.lineCap='round'; ctx.stroke();
+    ctx.lineCap='butt';
+  }
+  if(secondsLeft>0){
+    ctx.font='700 '+Math.round(rR*0.88)+'px "Google Sans",sans-serif';
+    ctx.fillStyle='white'; ctx.textAlign='center';
+    ctx.fillText(String(secondsLeft),rCX,rCY+rR*0.33);
+  }
+
+  requestAnimationFrame(()=>drawLoop(video,W,H));
+}
+
+function stopRecording(){
+  if(!isRecording) return;
+  drawRunning=false; isRecording=false;
+  mediaRecorder.stop();
+  document.getElementById('rec-badge').classList.remove('visible');
+}
+
+function stopChallenge(){ clearInterval(cdInterval); if(isRecording) stopRecording(); endChallenge(); }
+
+function endChallenge(){
+  clearInterval(cdInterval); if(isRecording) stopRecording();
+  const elapsed=startTime?Math.round((Date.now()-startTime)/1000):ragaCount*timePerRaga;
+  document.getElementById('stat-ragas').textContent=currentIdx;
+  document.getElementById('stat-time').textContent=elapsed+'s';
+  document.getElementById('stat-diff').textContent=difficulty[0].toUpperCase()+difficulty.slice(1);
+  setTimeout(()=>{ showScreen('done-screen'); processVideo(); },600);
+}
+
+async function processVideo(){
+  if(chunks.length===0){
+    document.getElementById('dl-btn').textContent='No recording found';
+    return;
+  }
+  finalBlob=new Blob(chunks,{type:'video/webm'});
+
+  if(typeof FFmpeg!=='undefined'&&FFmpeg.createFFmpeg){
+    const ov=document.getElementById('conv-overlay');
+    ov.classList.add('active');
+    setConv(5,'Loading converter…');
+    try{
+      const {createFFmpeg,fetchFile}=FFmpeg;
+      const ff=createFFmpeg({log:false,progress:({ratio})=>setConv(10+Math.round(ratio*85),'Converting…')});
+      await ff.load();
+      setConv(15,'Processing…');
+      ff.FS('writeFile','in.webm',new Uint8Array(await finalBlob.arrayBuffer()));
+      await ff.run('-i','in.webm','-c:v','libx264','-preset','fast','-crf','23','-c:a','aac','-movflags','+faststart','out.mp4');
+      setConv(98,'Finalising…');
+      const data=ff.FS('readFile','out.mp4');
+      mp4Blob=new Blob([data.buffer],{type:'video/mp4'});
+      setConv(100,'Done!');
+      setTimeout(()=>{ ov.classList.remove('active'); document.getElementById('dl-btn').textContent='⬇ Download MP4'; document.getElementById('dl-btn').disabled=false; },500);
+    }catch(e){
+      console.warn('ffmpeg failed:',e);
+      document.getElementById('conv-overlay').classList.remove('active');
+      document.getElementById('dl-btn').textContent='⬇ Download Video (WebM)';
+      document.getElementById('dl-btn').disabled=false;
+    }
+  } else {
+    document.getElementById('dl-btn').textContent='⬇ Download Video (WebM)';
+    document.getElementById('dl-btn').disabled=false;
+  }
+}
+
+function setConv(pct,msg){
+  document.getElementById('conv-fill').style.width=pct+'%';
+  document.getElementById('conv-sub').textContent=msg;
+}
+
+function downloadVideo(){
+  const blob=mp4Blob||finalBlob;
+  if(!blob){ alert('No recording found. Please record first!'); return; }
+  const ext=mp4Blob?'mp4':'webm';
+  const url=URL.createObjectURL(blob);
+  const a=document.createElement('a'); a.href=url;
+  a.download='raga-challenge-'+difficulty+'-'+Date.now()+'.'+ext;
+  a.click(); setTimeout(()=>URL.revokeObjectURL(url),2000);
+}
+
+function restart(){
+  if(mediaStream){ mediaStream.getTracks().forEach(t=>t.stop()); mediaStream=null; }
+  document.getElementById('preview-video').srcObject=null;
+  document.getElementById('video-bg').srcObject=null;
+  chunks=[]; finalBlob=null; mp4Blob=null;
+  isRecording=false; drawRunning=false; currentIdx=0;
+  showScreen('setup-screen');
+}
+
+function showScreen(id){
+  document.querySelectorAll('.screen').forEach(s=>s.classList.remove('active'));
+  document.getElementById(id).classList.add('active');
+}
+</script>
+<script async src="https://cdnjs.cloudflare.com/ajax/libs/ffmpeg.wasm/0.10.1/ffmpeg.min.js"></script>
+</body>
+</html>

@@ -340,7 +340,7 @@ let currentIdx=0, ragaList=[], cdInterval=null, secondsLeft=0;
 let mediaStream=null, mediaRecorder=null, chunks=[];
 let isRecording=false, startTime=null;
 let recCanvas=null, recCtx=null, drawRunning=false;
-let finalBlob=null, mp4Blob=null;
+let finalBlob=null;
 
 const CIRC = 2*Math.PI*44;
 document.getElementById('ring-progress').style.strokeDasharray = CIRC;
@@ -672,6 +672,10 @@ function endChallenge(){
   setTimeout(()=>{ showScreen('done-screen'); processVideo(); },600);
 }
 
+const CLOUDINARY_CLOUD='dfstch1ag';
+const CLOUDINARY_PRESET='forRagaChallange';
+let mp4Url=null;
+
 async function processVideo(){
   if(chunks.length===0){
     document.getElementById('dl-btn').textContent='No recording found';
@@ -679,31 +683,58 @@ async function processVideo(){
   }
   finalBlob=new Blob(chunks,{type:'video/webm'});
 
-  if(typeof FFmpeg!=='undefined'&&FFmpeg.createFFmpeg){
-    const ov=document.getElementById('conv-overlay');
-    ov.classList.add('active');
-    setConv(5,'Loading converter…');
-    try{
-      const {createFFmpeg,fetchFile}=FFmpeg;
-      const ff=createFFmpeg({log:false,progress:({ratio})=>setConv(10+Math.round(ratio*85),'Converting…')});
-      await ff.load();
-      setConv(15,'Processing…');
-      ff.FS('writeFile','in.webm',new Uint8Array(await finalBlob.arrayBuffer()));
-      await ff.run('-i','in.webm','-c:v','libx264','-preset','fast','-crf','23','-c:a','aac','-movflags','+faststart','out.mp4');
-      setConv(98,'Finalising…');
-      const data=ff.FS('readFile','out.mp4');
-      mp4Blob=new Blob([data.buffer],{type:'video/mp4'});
-      setConv(100,'Done!');
-      setTimeout(()=>{ ov.classList.remove('active'); document.getElementById('dl-btn').textContent='⬇ Download MP4'; document.getElementById('dl-btn').disabled=false; },500);
-    }catch(e){
-      console.warn('ffmpeg failed:',e);
-      document.getElementById('conv-overlay').classList.remove('active');
-      document.getElementById('dl-btn').textContent='⬇ Download Video (WebM)';
-      document.getElementById('dl-btn').disabled=false;
-    }
-  } else {
-    document.getElementById('dl-btn').textContent='⬇ Download Video (WebM)';
-    document.getElementById('dl-btn').disabled=false;
+  const ov=document.getElementById('conv-overlay');
+  ov.classList.add('active');
+  setConv(5,'Uploading video…');
+
+  try{
+    // Upload WebM to Cloudinary — it auto-converts to MP4
+    const fd=new FormData();
+    fd.append('file', finalBlob, 'raga-challenge.webm');
+    fd.append('upload_preset', CLOUDINARY_PRESET);
+    fd.append('resource_type', 'video');
+    fd.append('format', 'mp4');
+
+    const xhr=new XMLHttpRequest();
+    xhr.open('POST',`https://api.cloudinary.com/v1_1/${CLOUDINARY_CLOUD}/video/upload`);
+
+    xhr.upload.onprogress=e=>{
+      if(e.lengthComputable) setConv(5+Math.round((e.loaded/e.total)*70),'Uploading…');
+    };
+
+    await new Promise((resolve,reject)=>{
+      xhr.onload=()=>{
+        if(xhr.status===200){
+          const res=JSON.parse(xhr.responseText);
+          // Get MP4 url — replace extension to force mp4
+          mp4Url=res.secure_url.replace(/\.[^.]+$/,'.mp4');
+          resolve();
+        } else {
+          reject(new Error('Upload failed: '+xhr.status+' '+xhr.responseText));
+        }
+      };
+      xhr.onerror=()=>reject(new Error('Network error'));
+      xhr.send(fd);
+    });
+
+    setConv(85,'Converting to MP4…');
+    // Small wait for Cloudinary to finish processing
+    await new Promise(r=>setTimeout(r,2000));
+    setConv(100,'Ready!');
+    setTimeout(()=>{
+      ov.classList.remove('active');
+      const btn=document.getElementById('dl-btn');
+      btn.textContent='⬇ Download MP4';
+      btn.disabled=false;
+    },400);
+
+  }catch(e){
+    console.warn('Cloudinary upload failed:',e);
+    ov.classList.remove('active');
+    // Fallback: direct WebM download
+    const btn=document.getElementById('dl-btn');
+    btn.textContent='⬇ Download Video (WebM)';
+    btn.disabled=false;
   }
 }
 
@@ -712,21 +743,40 @@ function setConv(pct,msg){
   document.getElementById('conv-sub').textContent=msg;
 }
 
-function downloadVideo(){
-  const blob=mp4Blob||finalBlob;
-  if(!blob){ alert('No recording found. Please record first!'); return; }
-  const ext=mp4Blob?'mp4':'webm';
-  const url=URL.createObjectURL(blob);
-  const a=document.createElement('a'); a.href=url;
-  a.download='raga-challenge-'+difficulty+'-'+Date.now()+'.'+ext;
-  a.click(); setTimeout(()=>URL.revokeObjectURL(url),2000);
+async function downloadVideo(){
+  if(mp4Url){
+    // Download the MP4 from Cloudinary
+    setConv(0,'Preparing download…');
+    document.getElementById('conv-overlay').classList.add('active');
+    try{
+      const res=await fetch(mp4Url);
+      const blob=await res.blob();
+      setConv(100,'Done!');
+      setTimeout(()=>document.getElementById('conv-overlay').classList.remove('active'),300);
+      const url=URL.createObjectURL(blob);
+      const a=document.createElement('a'); a.href=url;
+      a.download='raga-challenge-'+difficulty+'-'+Date.now()+'.mp4';
+      a.click(); setTimeout(()=>URL.revokeObjectURL(url),2000);
+    }catch(e){
+      document.getElementById('conv-overlay').classList.remove('active');
+      // Open directly in new tab as fallback
+      window.open(mp4Url,'_blank');
+    }
+  } else if(finalBlob){
+    const url=URL.createObjectURL(finalBlob);
+    const a=document.createElement('a'); a.href=url;
+    a.download='raga-challenge-'+difficulty+'-'+Date.now()+'.webm';
+    a.click(); setTimeout(()=>URL.revokeObjectURL(url),2000);
+  } else {
+    alert('No recording found. Please record first!');
+  }
 }
 
 function restart(){
   if(mediaStream){ mediaStream.getTracks().forEach(t=>t.stop()); mediaStream=null; }
   document.getElementById('preview-video').srcObject=null;
   document.getElementById('video-bg').srcObject=null;
-  chunks=[]; finalBlob=null; mp4Blob=null;
+  chunks=[]; finalBlob=null; mp4Url=null;
   isRecording=false; drawRunning=false; currentIdx=0;
   showScreen('setup-screen');
 }
@@ -736,6 +786,6 @@ function showScreen(id){
   document.getElementById(id).classList.add('active');
 }
 </script>
-<script async src="https://cdnjs.cloudflare.com/ajax/libs/ffmpeg.wasm/0.10.1/ffmpeg.min.js"></script>
+
 </body>
 </html>

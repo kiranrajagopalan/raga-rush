@@ -688,38 +688,31 @@ async function processVideo(){
   setConv(5,'Uploading video…');
 
   try{
-    // Upload WebM to Cloudinary — it auto-converts to MP4
     const fd=new FormData();
-    fd.append('file', finalBlob, 'raga-challenge.webm');
+    fd.append('file', finalBlob, 'raga.webm');
     fd.append('upload_preset', CLOUDINARY_PRESET);
-    fd.append('resource_type', 'video');
-    fd.append('format', 'mp4');
 
     const xhr=new XMLHttpRequest();
-    xhr.open('POST',`https://api.cloudinary.com/v1_1/${CLOUDINARY_CLOUD}/video/upload`);
+    xhr.open('POST','https://api.cloudinary.com/v1_1/'+CLOUDINARY_CLOUD+'/video/upload');
 
     xhr.upload.onprogress=e=>{
-      if(e.lengthComputable) setConv(5+Math.round((e.loaded/e.total)*70),'Uploading…');
+      if(e.lengthComputable) setConv(5+Math.round((e.loaded/e.total)*75),'Uploading…');
     };
 
-    await new Promise((resolve,reject)=>{
+    const res=await new Promise((resolve,reject)=>{
       xhr.onload=()=>{
-        if(xhr.status===200){
-          const res=JSON.parse(xhr.responseText);
-          // Get MP4 url — replace extension to force mp4
-          mp4Url=res.secure_url.replace(/\.[^.]+$/,'.mp4');
-          resolve();
-        } else {
-          reject(new Error('Upload failed: '+xhr.status+' '+xhr.responseText));
-        }
+        const data=JSON.parse(xhr.responseText);
+        if(xhr.status===200) resolve(data);
+        else reject(new Error((data.error&&data.error.message)||('HTTP '+xhr.status)));
       };
       xhr.onerror=()=>reject(new Error('Network error'));
       xhr.send(fd);
     });
 
-    setConv(85,'Converting to MP4…');
-    // Small wait for Cloudinary to finish processing
-    await new Promise(r=>setTimeout(r,2000));
+    // Cloudinary can serve any video as mp4 via URL — just swap the extension
+    mp4Url=res.secure_url.replace(/\/upload\//, '/upload/f_mp4/').replace(/\.[^.]+$/, '.mp4');
+    // Store delete token to clean up after download
+    if(res.delete_token) window._cdDeleteToken=res.delete_token;
     setConv(100,'Ready!');
     setTimeout(()=>{
       ov.classList.remove('active');
@@ -729,18 +722,33 @@ async function processVideo(){
     },400);
 
   }catch(e){
-    console.warn('Cloudinary upload failed:',e);
     ov.classList.remove('active');
-    // Fallback: direct WebM download
     const btn=document.getElementById('dl-btn');
     btn.textContent='⬇ Download Video (WebM)';
     btn.disabled=false;
+    // Show error visibly for debugging
+    document.getElementById('conv-sub').textContent='Error: '+e.message;
+    document.getElementById('conv-overlay').classList.add('active');
+    document.getElementById('conv-fill').style.width='0%';
+    setTimeout(()=>document.getElementById('conv-overlay').classList.remove('active'),5000);
   }
 }
 
 function setConv(pct,msg){
   document.getElementById('conv-fill').style.width=pct+'%';
   document.getElementById('conv-sub').textContent=msg;
+}
+
+async function deleteFromCloudinary(){
+  if(!window._cdDeleteToken) return;
+  try{
+    await fetch('https://api.cloudinary.com/v1_1/'+CLOUDINARY_CLOUD+'/delete_by_token',{
+      method:'POST',
+      headers:{'Content-Type':'application/json'},
+      body:JSON.stringify({token:window._cdDeleteToken})
+    });
+    window._cdDeleteToken=null;
+  }catch(e){ /* silent fail — not critical */ }
 }
 
 async function downloadVideo(){
@@ -756,11 +764,14 @@ async function downloadVideo(){
       const url=URL.createObjectURL(blob);
       const a=document.createElement('a'); a.href=url;
       a.download='raga-challenge-'+difficulty+'-'+Date.now()+'.mp4';
-      a.click(); setTimeout(()=>URL.revokeObjectURL(url),2000);
+      a.click();
+      setTimeout(()=>URL.revokeObjectURL(url),2000);
+      // Delete from Cloudinary after download — no need to store it
+      setTimeout(deleteFromCloudinary, 3000);
     }catch(e){
       document.getElementById('conv-overlay').classList.remove('active');
-      // Open directly in new tab as fallback
       window.open(mp4Url,'_blank');
+      setTimeout(deleteFromCloudinary, 5000);
     }
   } else if(finalBlob){
     const url=URL.createObjectURL(finalBlob);

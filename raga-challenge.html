@@ -616,23 +616,25 @@ function startRecording(){
   chunks=[];
   const app=document.getElementById('app');
   const video=document.getElementById('video-bg');
-  // Use actual app dimensions so canvas exactly matches what user sees
   const W=app.offsetWidth, H=app.offsetHeight;
+  // Scale canvas by device pixel ratio (capped at 2×) for sharper recording
+  const dpr=Math.min(window.devicePixelRatio||1,2);
+  const CW=Math.round(W*dpr), CH=Math.round(H*dpr);
   recCanvas=document.createElement('canvas');
-  recCanvas.width=W; recCanvas.height=H;
+  recCanvas.width=CW; recCanvas.height=CH;
   recCtx=recCanvas.getContext('2d');
   const cs=recCanvas.captureStream(30);
   mediaStream.getAudioTracks().forEach(t=>cs.addTrack(t));
   const mimes=['video/webm;codecs=vp9,opus','video/webm;codecs=vp8,opus','video/webm'];
   const mime=mimes.find(m=>MediaRecorder.isTypeSupported(m))||'video/webm';
-  mediaRecorder=new MediaRecorder(cs,{mimeType:mime,videoBitsPerSecond:6000000});
+  mediaRecorder=new MediaRecorder(cs,{mimeType:mime,videoBitsPerSecond:8000000});
   mediaRecorder.ondataavailable=e=>{ if(e.data.size>0) chunks.push(e.data); };
   isRecording=true; drawRunning=true;
   mediaRecorder.start(100); startTime=Date.now();
-  drawLoop(video,W,H);
+  drawLoop(video,CW,CH,dpr);
 }
 
-function drawLoop(video,W,H){
+function drawLoop(video,W,H,dpr=1){
   if(!drawRunning) return;
   const ctx=recCtx;
 
@@ -679,7 +681,7 @@ function drawLoop(video,W,H){
     ctx.shadowColor='rgba(245,200,66,0.6)'; ctx.shadowBlur=60;
     ctx.fillText(countdownText,W/2,H/2);
     ctx.shadowBlur=0; ctx.textBaseline='alphabetic';
-    requestAnimationFrame(()=>drawLoop(video,W,H));
+    requestAnimationFrame(()=>drawLoop(video,W,H,dpr));
     return;
   }
 
@@ -751,7 +753,7 @@ function drawLoop(video,W,H){
       ctx.globalAlpha=1;
     }
 
-    requestAnimationFrame(()=>drawLoop(video,W,H));
+    requestAnimationFrame(()=>drawLoop(video,W,H,dpr));
     return;
   }
 
@@ -782,7 +784,7 @@ function drawLoop(video,W,H){
     const inner=document.getElementById('slot-inner');
     const mat=new DOMMatrix(window.getComputedStyle(inner).transform);
     const ty=mat.m42;
-    const wH=192, wY=BOT_Y+(BOT_H-192)/2, IH=64;
+    const wH=192*dpr, wY=BOT_Y+(BOT_H-192*dpr)/2, IH=64*dpr;
     const fsize=fs(0.082);
     ctx.font='700 '+fsize+'px "Google Sans",sans-serif';
     ctx.textAlign='center';
@@ -796,7 +798,7 @@ function drawLoop(video,W,H){
     });
     // Gold lines
     const l1=wY+wH*0.32, l2=wY+wH*0.68;
-    ctx.strokeStyle='#F5C842'; ctx.lineWidth=2;
+    ctx.strokeStyle='#F5C842'; ctx.lineWidth=2*dpr;
     ctx.shadowColor='#F5C842'; ctx.shadowBlur=14;
     ctx.beginPath(); ctx.moveTo(W*0.05,l1); ctx.lineTo(W*0.95,l1); ctx.stroke();
     ctx.beginPath(); ctx.moveTo(W*0.05,l2); ctx.lineTo(W*0.95,l2); ctx.stroke();
@@ -810,7 +812,7 @@ function drawLoop(video,W,H){
     ctx.fillStyle=gf; ctx.fillRect(0,wY+wH*0.62,W,wH*0.38);
     ctx.font='400 '+fs(0.027)+'px "Google Sans",sans-serif';
     ctx.fillStyle='rgba(255,255,255,0.4)'; ctx.textAlign='center';
-    ctx.fillText('PICKING YOUR RAGA…',W/2,wY+wH+28);
+    ctx.fillText('PICKING YOUR RAGA…',W/2,wY+wH+28*dpr);
   } else {
     // ── Raga name ──
     const rd=document.getElementById('raga-display');
@@ -833,11 +835,11 @@ function drawLoop(video,W,H){
   const rCX=W*0.22, rCY=BOT_Y+BOT_H*0.78, rR=W*0.12;
   const frac=Math.max(0,secondsLeft/timePerRaga);
   ctx.beginPath(); ctx.arc(rCX,rCY,rR,0,Math.PI*2);
-  ctx.strokeStyle='rgba(255,255,255,0.12)'; ctx.lineWidth=4; ctx.stroke();
+  ctx.strokeStyle='rgba(255,255,255,0.12)'; ctx.lineWidth=4*dpr; ctx.stroke();
   if(secondsLeft>0&&frac>0){
     const r2=Math.round(245+(230-245)*(1-frac)), g2=Math.round(200+(57-200)*(1-frac)), b2=Math.round(66+(70-66)*(1-frac));
     ctx.beginPath(); ctx.arc(rCX,rCY,rR,-Math.PI/2,-Math.PI/2+Math.PI*2*frac);
-    ctx.strokeStyle='rgb('+r2+','+g2+','+b2+')'; ctx.lineWidth=4; ctx.lineCap='round'; ctx.stroke();
+    ctx.strokeStyle='rgb('+r2+','+g2+','+b2+')'; ctx.lineWidth=4*dpr; ctx.lineCap='round'; ctx.stroke();
     ctx.lineCap='butt';
   }
   if(secondsLeft>0){
@@ -846,7 +848,7 @@ function drawLoop(video,W,H){
     ctx.fillText(String(secondsLeft),rCX,rCY+rR*0.35);
   }
 
-  requestAnimationFrame(()=>drawLoop(video,W,H));
+  requestAnimationFrame(()=>drawLoop(video,W,H,dpr));
 }
 
 function stopRecording(onStopped){

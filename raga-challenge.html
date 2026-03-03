@@ -129,15 +129,19 @@ html, body {
   100% { transform:scale(1); opacity:1; }
 }
 
-/* ── CAMERA SCREEN ── */
-#camera-screen { background:#000; }
+/* ── CAMERA SCREEN — 3-section layout ── */
+#camera-screen { background:#000; display:flex; flex-direction:column; }
+.cam-top { flex:0 0 15%; display:flex; align-items:center; justify-content:space-between; padding:0 7%; background:#000; z-index:10; }
+.cam-middle { flex:0 0 55%; position:relative; overflow:hidden; }
+.cam-bottom { flex:0 0 30%; position:relative; display:flex; flex-direction:column; align-items:center; justify-content:space-around; padding:6px 7% 10px; background:#000; }
+.cam-bottom-row { display:flex; align-items:center; gap:5%; width:100%; }
+#end-btn { flex:1; }
 #video-bg { position:absolute; inset:0; width:100%; height:100%; object-fit:cover; transform:scaleX(-1); }
 .cam-overlay-top { position:absolute; top:0; left:0; right:0; height:25%; background:linear-gradient(to bottom,rgba(0,0,0,0.8) 0%,transparent 100%); pointer-events:none; }
 .cam-overlay-bottom { position:absolute; bottom:0; left:0; right:0; height:35%; background:linear-gradient(to top,rgba(0,0,0,0.88) 0%,transparent 100%); pointer-events:none; }
-#top-bar { position:absolute; top:0; left:0; right:0; padding:6% 7% 0; display:flex; align-items:center; justify-content:space-between; z-index:10; }
 .raga-counter { font-size:13px; letter-spacing:1px; color:rgba(255,255,255,0.75); font-weight:500; }
 .difficulty-badge { font-size:10px; letter-spacing:2px; text-transform:uppercase; padding:4px 12px; border-radius:20px; border:1px solid var(--glass-border); background:var(--glass); backdrop-filter:blur(8px); color:var(--gold); font-weight:500; }
-#rec-badge { position:absolute; top:6%; left:50%; transform:translateX(-50%); display:flex; align-items:center; gap:6px; font-size:11px; letter-spacing:2px; color:var(--red); opacity:0; transition:opacity 0.3s; font-weight:500; }
+#rec-badge { display:flex; align-items:center; gap:6px; font-size:11px; letter-spacing:2px; color:var(--red); opacity:0; transition:opacity 0.3s; font-weight:500; }
 #rec-badge.visible { opacity:1; }
 .rec-dot { width:7px; height:7px; border-radius:50%; background:var(--red); animation:blink 1s infinite; }
 @keyframes blink { 0%,100%{opacity:1} 50%{opacity:0.1} }
@@ -162,28 +166,27 @@ html, body {
 .slot-hint { margin-top:18px; font-size:11px; letter-spacing:3px; color:rgba(255,255,255,0.45); text-transform:uppercase; font-weight:400; }
 
 /* ── RAGA DISPLAY ── */
-#raga-display { position:absolute; left:0; right:0; top:40%; transform:translateY(-50%); display:flex; flex-direction:column; align-items:center; pointer-events:none; z-index:5; opacity:0; transition:opacity 0.4s; }
+#raga-display { display:flex; flex-direction:column; align-items:center; pointer-events:none; opacity:0; transition:opacity 0.4s; }
 #raga-display.visible { opacity:1; }
-#raga-label { font-size:11px; letter-spacing:5px; text-transform:uppercase; color:var(--gold); margin-bottom:12px; font-weight:500; }
-#raga-name { font-size:clamp(52px,16vw,88px); line-height:1.05; text-align:center; color:white; text-shadow:0 0 60px rgba(245,200,66,0.45), 0 4px 40px rgba(0,0,0,0.9); padding:0 4%; font-weight:700; }
+#raga-label { font-size:11px; letter-spacing:5px; text-transform:uppercase; color:var(--gold); margin-bottom:8px; font-weight:500; }
+#raga-name { font-size:clamp(18px,6.5vw,28px); line-height:1.1; text-align:center; color:white; text-shadow:0 0 60px rgba(245,200,66,0.45), 0 4px 40px rgba(0,0,0,0.9); padding:0 2%; font-weight:700; white-space:nowrap; }
 #raga-name.reveal { animation:ragaReveal 0.7s cubic-bezier(0.34,1.56,0.64,1); }
-@keyframes ragaReveal { 0%{transform:scale(0.4) translateY(30px);opacity:0;filter:blur(12px)} 100%{transform:scale(1) translateY(0);opacity:1;filter:blur(0)} }
+@keyframes ragaReveal { 0%{transform:scale(0.4) translateY(20px);opacity:0;filter:blur(8px)} 100%{transform:scale(1) translateY(0);opacity:1;filter:blur(0)} }
 
 /* countdown ring */
-#countdown-wrap { position:absolute; bottom:8%; left:50%; transform:translateX(-50%); z-index:5; }
-.ring-container { position:relative; width:clamp(100px,28vw,130px); height:clamp(100px,28vw,130px); }
+#countdown-wrap { flex-shrink:0; }
+.ring-container { position:relative; width:clamp(70px,19vw,88px); height:clamp(70px,19vw,88px); }
 #ring-svg { width:100%; height:100%; transform:rotate(-90deg); }
 #ring-bg  { fill:none; stroke:rgba(255,255,255,0.12); stroke-width:5; }
 #ring-progress { fill:none; stroke:var(--gold); stroke-width:5; stroke-linecap:round; transition:stroke-dashoffset 0.15s linear; }
-#countdown-num { position:absolute; inset:0; display:flex; align-items:center; justify-content:center; font-size:clamp(34px,11vw,48px); font-weight:700; }
+#countdown-num { position:absolute; inset:0; display:flex; align-items:center; justify-content:center; font-size:clamp(22px,7vw,32px); font-weight:700; }
 
 /* particles */
 #reveal-particles { position:absolute; inset:0; pointer-events:none; overflow:hidden; z-index:6; }
 .particle { position:absolute; width:5px; height:5px; border-radius:50%; animation:pBurst 0.9s ease-out forwards; }
 @keyframes pBurst { 0%{transform:translate(0,0) scale(1);opacity:1} 100%{transform:translate(var(--tx),var(--ty)) scale(0);opacity:0} }
 
-/* bottom controls */
-#bottom-controls { position:absolute; bottom:4%; left:0; right:0; display:flex; gap:4%; padding:0 7%; z-index:10; }
+/* controls */
 .ctrl-btn { flex:1; padding:4.5% 0; border-radius:12px; border:1px solid var(--glass-border); background:var(--glass); color:white; font-family:var(--font); font-size:15px; font-weight:600; cursor:pointer; backdrop-filter:blur(12px); transition:all 0.2s; position:relative; overflow:hidden; user-select:none; -webkit-user-select:none; }
 .ctrl-btn.primary { background:var(--red); border-color:var(--red); box-shadow:0 4px 20px rgba(230,57,70,0.5); }
 .ctrl-btn:active { transform:scale(0.97); }
@@ -292,43 +295,59 @@ html, body {
 
   <!-- CHALLENGE -->
   <div id="camera-screen" class="screen">
-    <video id="video-bg" autoplay muted playsinline></video>
-    <div class="cam-overlay-top"></div>
-    <div class="cam-overlay-bottom"></div>
-    <div id="slot-wrap">
-      <div id="slot-window">
-        <div class="sel-line top"></div>
-        <div class="sel-line bot"></div>
-        <div id="slot-inner"></div>
-      </div>
-      <div class="slot-hint">Picking your Raga…</div>
-    </div>
-    <div id="raga-display">
-      <div id="raga-label">Now Sing</div>
-      <div id="raga-name">—</div>
-    </div>
-    <div id="reveal-particles"></div>
-    <div id="top-bar">
+
+    <!-- TOP 15%: counter · REC · difficulty -->
+    <div class="cam-top">
       <div class="raga-counter" id="raga-counter">0 / 10</div>
       <div id="rec-badge"><div class="rec-dot"></div>REC</div>
       <div class="difficulty-badge" id="diff-badge">Easy</div>
     </div>
-    <div id="countdown-wrap">
-      <div class="ring-container">
-        <svg id="ring-svg" viewBox="0 0 100 100">
-          <circle id="ring-bg" cx="50" cy="50" r="44"/>
-          <circle id="ring-progress" cx="50" cy="50" r="44"/>
-        </svg>
-        <div id="countdown-num">—</div>
+
+    <!-- MIDDLE 55%: camera feed -->
+    <div class="cam-middle">
+      <video id="video-bg" autoplay muted playsinline></video>
+      <div class="cam-overlay-top"></div>
+      <div class="cam-overlay-bottom"></div>
+    </div>
+
+    <!-- BOTTOM 30%: raga info + controls -->
+    <div class="cam-bottom">
+      <!-- Slot machine: overlays cam-bottom only when active -->
+      <div id="slot-wrap">
+        <div id="slot-window">
+          <div class="sel-line top"></div>
+          <div class="sel-line bot"></div>
+          <div id="slot-inner"></div>
+        </div>
+        <div class="slot-hint">Picking your Raga…</div>
+      </div>
+      <!-- Raga display -->
+      <div id="raga-display">
+        <div id="raga-label">Now Sing</div>
+        <div id="raga-name">—</div>
+      </div>
+      <!-- Bottom row: countdown ring LEFT · hold button RIGHT -->
+      <div class="cam-bottom-row">
+        <div id="countdown-wrap">
+          <div class="ring-container">
+            <svg id="ring-svg" viewBox="0 0 100 100">
+              <circle id="ring-bg" cx="50" cy="50" r="44"/>
+              <circle id="ring-progress" cx="50" cy="50" r="44"/>
+            </svg>
+            <div id="countdown-num">—</div>
+          </div>
+        </div>
+        <button class="ctrl-btn primary" id="end-btn">
+          <div id="end-btn-fill"></div>
+          Hold to End
+        </button>
       </div>
     </div>
-    <div id="bottom-controls">
-      <button class="ctrl-btn primary" id="end-btn">
-        <div id="end-btn-fill"></div>
-        Hold to End
-      </button>
-    </div>
+
+    <!-- Full-screen absolute overlays (particles + flash stay at camera-screen level) -->
+    <div id="reveal-particles"></div>
     <div id="flash"></div>
+
   </div>
 
   <!-- RESULTS -->
@@ -560,7 +579,7 @@ function updateRing(s){
 function spawnParticles(){
   const c=document.getElementById('reveal-particles'); c.innerHTML='';
   const app=document.getElementById('app');
-  const cx=app.offsetWidth/2, cy=app.offsetHeight*0.42;
+  const cx=app.offsetWidth/2, cy=app.offsetHeight*0.70+app.offsetHeight*0.30*0.40;
   for(let i=0;i<22;i++){
     const p=document.createElement('div'); p.className='particle';
     const angle=(i/22)*Math.PI*2, dist=50+Math.random()*100;
@@ -597,25 +616,31 @@ function drawLoop(video,W,H){
   if(!drawRunning) return;
   const ctx=recCtx;
 
-  // ── Video: fill canvas preserving aspect ratio (cover) ──
-  // The browser renders the video with object-fit:cover + scaleX(-1)
-  // We replicate this exactly on canvas
-  const vw=video.videoWidth||W, vh=video.videoHeight||H;
-  const scale=Math.max(W/vw, H/vh);
+  // ── Section layout constants (15% top / 55% camera / 30% bottom) ──
+  const TOP_H=H*0.15, MID_H=H*0.55, BOT_Y=H*0.70, BOT_H=H*0.30;
+
+  // ── Solid black for top and bottom sections ──
+  ctx.fillStyle='#000';
+  ctx.fillRect(0,0,W,TOP_H);
+  ctx.fillRect(0,BOT_Y,W,BOT_H);
+
+  // ── Video: fill camera section only (cover logic, offset to middle section) ──
+  const vw=video.videoWidth||W, vh=video.videoHeight||MID_H;
+  const scale=Math.max(W/vw, MID_H/vh);
   const sw=vw*scale, sh=vh*scale;
-  const ox=(W-sw)/2, oy=(H-sh)/2;
+  const ox=(W-sw)/2, oy=TOP_H+(MID_H-sh)/2;
   ctx.save();
   ctx.translate(W,0); ctx.scale(-1,1);
   ctx.drawImage(video,ox,oy,sw,sh);
   ctx.restore();
 
-  // ── Gradient overlays ──
-  let g=ctx.createLinearGradient(0,0,0,H*0.26);
-  g.addColorStop(0,'rgba(0,0,0,0.8)'); g.addColorStop(1,'rgba(0,0,0,0)');
-  ctx.fillStyle=g; ctx.fillRect(0,0,W,H*0.26);
-  g=ctx.createLinearGradient(0,H*0.64,0,H);
-  g.addColorStop(0,'rgba(0,0,0,0)'); g.addColorStop(1,'rgba(0,0,0,0.88)');
-  ctx.fillStyle=g; ctx.fillRect(0,H*0.64,W,H*0.36);
+  // ── Gradient overlays (constrained to camera section) ──
+  let g=ctx.createLinearGradient(0,TOP_H,0,TOP_H+MID_H*0.35);
+  g.addColorStop(0,'rgba(0,0,0,0.7)'); g.addColorStop(1,'rgba(0,0,0,0)');
+  ctx.fillStyle=g; ctx.fillRect(0,TOP_H,W,MID_H*0.35);
+  g=ctx.createLinearGradient(0,BOT_Y-MID_H*0.25,0,BOT_Y);
+  g.addColorStop(0,'rgba(0,0,0,0)'); g.addColorStop(1,'rgba(0,0,0,0.7)');
+  ctx.fillStyle=g; ctx.fillRect(0,BOT_Y-MID_H*0.25,W,MID_H*0.25);
 
   // ── 3-2-1-GO countdown (baked into recording) ──
   if(countdownActive && countdownText){
@@ -705,7 +730,7 @@ function drawLoop(video,W,H){
     return;
   }
 
-  const topY=H*0.1;
+  const topY=TOP_H*0.60;   // vertically centred in the 15% top strip
   const fs=s=>Math.round(W*s);
 
   // ── Counter ──
@@ -728,11 +753,11 @@ function drawLoop(video,W,H){
   // ── Slot machine (when active) ──
   const slotWrap=document.getElementById('slot-wrap');
   if(slotWrap.classList.contains('active')){
-    ctx.fillStyle='rgba(0,0,0,0.65)'; ctx.fillRect(0,0,W,H);
+    ctx.fillStyle='rgba(0,0,0,0.8)'; ctx.fillRect(0,BOT_Y,W,BOT_H);
     const inner=document.getElementById('slot-inner');
     const mat=new DOMMatrix(window.getComputedStyle(inner).transform);
     const ty=mat.m42;
-    const wH=192, wY=(H-wH)/2, IH=64;
+    const wH=192, wY=BOT_Y+(BOT_H-192)/2, IH=64;
     const fsize=fs(0.082);
     ctx.font='700 '+fsize+'px "Google Sans",sans-serif';
     ctx.textAlign='center';
@@ -769,18 +794,18 @@ function drawLoop(video,W,H){
       if(name&&name!=='—'){
         ctx.font='500 '+fs(0.028)+'px "Google Sans",sans-serif';
         ctx.fillStyle='#F5C842'; ctx.textAlign='center';
-        ctx.fillText('NOW SING',W/2,H*0.40-H*0.058);
-        ctx.font='700 '+fs(0.16)+'px "Google Sans",sans-serif';
+        ctx.fillText('NOW SING',W/2,BOT_Y+BOT_H*0.28);
+        ctx.font='700 '+fs(0.065)+'px "Google Sans",sans-serif';
         ctx.fillStyle='white'; ctx.textAlign='center';
-        ctx.shadowColor='rgba(245,200,66,0.45)'; ctx.shadowBlur=50;
-        ctx.fillText(name,W/2,H*0.43);
+        ctx.shadowColor='rgba(245,200,66,0.45)'; ctx.shadowBlur=40;
+        ctx.fillText(name,W/2,BOT_Y+BOT_H*0.52);
         ctx.shadowBlur=0;
       }
     }
   }
 
-  // ── Countdown ring on canvas ──
-  const rCX=W/2, rCY=H*0.90, rR=W*0.145;
+  // ── Countdown ring on canvas (left side of bottom row) ──
+  const rCX=W*0.22, rCY=BOT_Y+BOT_H*0.78, rR=W*0.12;
   const frac=Math.max(0,secondsLeft/timePerRaga);
   ctx.beginPath(); ctx.arc(rCX,rCY,rR,0,Math.PI*2);
   ctx.strokeStyle='rgba(255,255,255,0.12)'; ctx.lineWidth=4; ctx.stroke();

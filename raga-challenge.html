@@ -538,22 +538,30 @@ function runSlotMachine(target, onDone){
   const inner=document.getElementById('slot-inner');
   const pool=RAGAS[difficulty];
   const items=[];
-  for(let i=0;i<26;i++) items.push(pool[Math.floor(Math.random()*pool.length)]);
+  for(let i=0;i<20;i++) items.push(pool[Math.floor(Math.random()*pool.length)]);
   items.push(target);
   const ITEM_H=64;
   inner.innerHTML=items.map(n=>'<div class="slot-item">'+n+'</div>').join('');
   wrap.classList.add('active');
   const finalY=-(items.length-1)*ITEM_H;
-  let currentY=0, speed=ITEM_H*0.55;
-  const MIN=1.0, SLOW_ZONE=ITEM_H*7;
+  let currentY=0, speed=ITEM_H*0.38;
+  const SLOW_ZONE=ITEM_H*10;
   function tick(){
     const dist=Math.abs(finalY-currentY);
-    if(dist<SLOW_ZONE) speed=Math.max(MIN,(dist/SLOW_ZONE)*ITEM_H*0.5);
+    // Snap cleanly when close enough — no crawl, no abrupt stop
+    if(dist<0.5){
+      inner.style.transform='translateY('+finalY+'px)';
+      const lastIdx=items.length-1;
+      inner.querySelectorAll('.slot-item').forEach((el,i)=>el.classList.toggle('center',i===lastIdx));
+      setTimeout(()=>{ wrap.classList.remove('active'); onDone(); },700);
+      return;
+    }
+    // Quadratic ease-out: speed approaches zero naturally as dist → 0
+    if(dist<SLOW_ZONE) speed=Math.pow(dist/SLOW_ZONE,2)*ITEM_H*0.38;
     currentY=Math.max(currentY-speed,finalY);
     inner.style.transform='translateY('+currentY+'px)';
     const ci=Math.round(Math.abs(currentY)/ITEM_H);
     inner.querySelectorAll('.slot-item').forEach((el,i)=>el.classList.toggle('center',i===ci));
-    if(currentY<=finalY){ setTimeout(()=>{ wrap.classList.remove('active'); onDone(); },700); return; }
     requestAnimationFrame(tick);
   }
   requestAnimationFrame(tick);

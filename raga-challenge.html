@@ -162,20 +162,20 @@ html, body {
 .slot-hint { margin-top:18px; font-size:11px; letter-spacing:3px; color:rgba(255,255,255,0.45); text-transform:uppercase; font-weight:400; }
 
 /* ── RAGA DISPLAY ── */
-#raga-display { position:absolute; left:0; right:0; top:42%; transform:translateY(-50%); display:flex; flex-direction:column; align-items:center; pointer-events:none; z-index:5; opacity:0; transition:opacity 0.4s; }
+#raga-display { position:absolute; left:0; right:0; top:40%; transform:translateY(-50%); display:flex; flex-direction:column; align-items:center; pointer-events:none; z-index:5; opacity:0; transition:opacity 0.4s; }
 #raga-display.visible { opacity:1; }
-#raga-label { font-size:10px; letter-spacing:4px; text-transform:uppercase; color:rgba(255,255,255,0.4); margin-bottom:8px; }
-#raga-name { font-size:clamp(36px,11vw,58px); line-height:1; text-align:center; color:white; text-shadow:0 4px 40px rgba(0,0,0,0.9); padding:0 5%; font-weight:700; }
+#raga-label { font-size:11px; letter-spacing:5px; text-transform:uppercase; color:var(--gold); margin-bottom:12px; font-weight:500; }
+#raga-name { font-size:clamp(52px,16vw,88px); line-height:1.05; text-align:center; color:white; text-shadow:0 0 60px rgba(245,200,66,0.45), 0 4px 40px rgba(0,0,0,0.9); padding:0 4%; font-weight:700; }
 #raga-name.reveal { animation:ragaReveal 0.7s cubic-bezier(0.34,1.56,0.64,1); }
 @keyframes ragaReveal { 0%{transform:scale(0.4) translateY(30px);opacity:0;filter:blur(12px)} 100%{transform:scale(1) translateY(0);opacity:1;filter:blur(0)} }
 
 /* countdown ring */
-#countdown-wrap { position:absolute; bottom:13%; left:50%; transform:translateX(-50%); z-index:5; }
-.ring-container { position:relative; width:clamp(72px,22vw,96px); height:clamp(72px,22vw,96px); }
+#countdown-wrap { position:absolute; bottom:8%; left:50%; transform:translateX(-50%); z-index:5; }
+.ring-container { position:relative; width:clamp(100px,28vw,130px); height:clamp(100px,28vw,130px); }
 #ring-svg { width:100%; height:100%; transform:rotate(-90deg); }
-#ring-bg  { fill:none; stroke:rgba(255,255,255,0.1); stroke-width:4; }
-#ring-progress { fill:none; stroke:var(--gold); stroke-width:4; stroke-linecap:round; transition:stroke-dashoffset 0.15s linear; }
-#countdown-num { position:absolute; inset:0; display:flex; align-items:center; justify-content:center; font-size:clamp(24px,8vw,34px); font-weight:700; }
+#ring-bg  { fill:none; stroke:rgba(255,255,255,0.12); stroke-width:5; }
+#ring-progress { fill:none; stroke:var(--gold); stroke-width:5; stroke-linecap:round; transition:stroke-dashoffset 0.15s linear; }
+#countdown-num { position:absolute; inset:0; display:flex; align-items:center; justify-content:center; font-size:clamp(34px,11vw,48px); font-weight:700; }
 
 /* particles */
 #reveal-particles { position:absolute; inset:0; pointer-events:none; overflow:hidden; z-index:6; }
@@ -184,9 +184,10 @@ html, body {
 
 /* bottom controls */
 #bottom-controls { position:absolute; bottom:4%; left:0; right:0; display:flex; gap:4%; padding:0 7%; z-index:10; }
-.ctrl-btn { flex:1; padding:4.5% 0; border-radius:12px; border:1px solid var(--glass-border); background:var(--glass); color:white; font-family:var(--font); font-size:15px; font-weight:600; cursor:pointer; backdrop-filter:blur(12px); transition:all 0.2s; }
+.ctrl-btn { flex:1; padding:4.5% 0; border-radius:12px; border:1px solid var(--glass-border); background:var(--glass); color:white; font-family:var(--font); font-size:15px; font-weight:600; cursor:pointer; backdrop-filter:blur(12px); transition:all 0.2s; position:relative; overflow:hidden; user-select:none; -webkit-user-select:none; }
 .ctrl-btn.primary { background:var(--red); border-color:var(--red); box-shadow:0 4px 20px rgba(230,57,70,0.5); }
-.ctrl-btn:active { transform:scale(0.96); }
+.ctrl-btn:active { transform:scale(0.97); }
+#end-btn-fill { position:absolute; inset:0; background:rgba(255,255,255,0.25); transform:scaleX(0); transform-origin:left; border-radius:12px; pointer-events:none; transition:transform 0s linear; }
 #flash { position:absolute; inset:0; background:white; opacity:0; pointer-events:none; z-index:30; }
 #flash.on { opacity:0.2; }
 
@@ -205,12 +206,19 @@ html, body {
 .download-btn:disabled { opacity:0.5; cursor:not-allowed; }
 .restart-btn { background:transparent; border:1px solid var(--glass-border); color:rgba(255,255,255,0.45); padding:4%; border-radius:12px; width:100%; font-family:var(--font); font-size:14px; font-weight:500; cursor:pointer; transition:all 0.2s; }
 .restart-btn:hover { border-color:white; color:white; }
-#conv-overlay { display:none; position:absolute; inset:0; background:rgba(0,0,0,0.92); flex-direction:column; align-items:center; justify-content:center; gap:14px; z-index:50; padding:10%; text-align:center; }
+#conv-overlay { display:none; position:absolute; inset:0; background:rgba(0,0,0,0.94); flex-direction:column; align-items:center; justify-content:center; gap:18px; z-index:50; padding:10%; text-align:center; }
 #conv-overlay.active { display:flex; }
+.conv-emoji { font-size:52px; animation:convPulse 1.4s ease-in-out infinite; }
+@keyframes convPulse { 0%,100%{transform:scale(1)} 50%{transform:scale(1.15)} }
 .conv-title { font-size:22px; font-weight:700; color:var(--gold); }
-.conv-sub   { font-size:13px; color:rgba(255,255,255,0.5); }
-.conv-track { width:80%; height:4px; background:rgba(255,255,255,0.1); border-radius:4px; overflow:hidden; }
-.conv-fill  { height:100%; background:var(--gold); width:0%; transition:width 0.4s; border-radius:4px; }
+.conv-sub   { font-size:14px; color:rgba(255,255,255,0.6); min-height:22px; }
+.conv-track { width:82%; height:6px; background:rgba(255,255,255,0.1); border-radius:6px; overflow:hidden; }
+.conv-fill  { height:100%; background:linear-gradient(90deg,var(--gold),#ffaa00); width:0%; transition:width 0.5s ease; border-radius:6px; box-shadow:0 0 12px rgba(245,200,66,0.6); }
+.conv-stages { display:flex; gap:8px; margin-top:4px; }
+.conv-stage { width:8px; height:8px; border-radius:50%; background:rgba(255,255,255,0.15); transition:background 0.3s; }
+.conv-stage.done { background:var(--gold); }
+.conv-stage.active-stage { background:white; animation:stagePulse 0.7s ease-in-out infinite; }
+@keyframes stagePulse { 0%,100%{opacity:1} 50%{opacity:0.3} }
 </style>
 </head>
 <body>
@@ -303,7 +311,10 @@ html, body {
       </div>
     </div>
     <div id="bottom-controls">
-      <button class="ctrl-btn primary" onclick="stopChallenge()">End Challenge</button>
+      <button class="ctrl-btn primary" id="end-btn">
+        <div id="end-btn-fill"></div>
+        Hold to End
+      </button>
     </div>
     <div id="flash"></div>
   </div>
@@ -311,9 +322,16 @@ html, body {
   <!-- DONE -->
   <div id="done-screen" class="screen">
     <div id="conv-overlay">
-      <div class="conv-title">Converting to MP4…</div>
-      <div class="conv-sub" id="conv-sub">Loading converter…</div>
+      <div class="conv-emoji" id="conv-emoji">🎬</div>
+      <div class="conv-title" id="conv-title">Processing…</div>
+      <div class="conv-sub" id="conv-sub">Getting ready…</div>
       <div class="conv-track"><div class="conv-fill" id="conv-fill"></div></div>
+      <div class="conv-stages">
+        <div class="conv-stage" id="cs0"></div>
+        <div class="conv-stage" id="cs1"></div>
+        <div class="conv-stage" id="cs2"></div>
+        <div class="conv-stage" id="cs3"></div>
+      </div>
     </div>
     <div class="done-icon">🎶</div>
     <div class="done-title">Incredible!</div>
@@ -323,7 +341,7 @@ html, body {
       <div class="stat-box"><div class="stat-num" id="stat-time">0s</div><div class="stat-label">Duration</div></div>
       <div class="stat-box"><div class="stat-num" id="stat-diff">—</div><div class="stat-label">Level</div></div>
     </div>
-    <button class="download-btn" id="dl-btn" onclick="downloadVideo()" disabled>⏳ Preparing…</button>
+    <button class="download-btn" id="dl-btn" onclick="shareOrDownload()" disabled>⏳ Preparing…</button>
     <button class="restart-btn" onclick="restart()">New Challenge</button>
   </div>
 
@@ -622,33 +640,33 @@ function drawLoop(video,W,H){
     if(rd.classList.contains('visible')){
       const name=document.getElementById('raga-name').textContent;
       if(name&&name!=='—'){
-        ctx.font='400 '+fs(0.026)+'px "Google Sans",sans-serif';
-        ctx.fillStyle='rgba(255,255,255,0.38)'; ctx.textAlign='center';
-        ctx.fillText('NOW SING',W/2,H*0.42-H*0.045);
-        ctx.font='700 '+fs(0.13)+'px "Google Sans",sans-serif';
+        ctx.font='500 '+fs(0.028)+'px "Google Sans",sans-serif';
+        ctx.fillStyle='#F5C842'; ctx.textAlign='center';
+        ctx.fillText('NOW SING',W/2,H*0.40-H*0.058);
+        ctx.font='700 '+fs(0.16)+'px "Google Sans",sans-serif';
         ctx.fillStyle='white'; ctx.textAlign='center';
-        ctx.shadowColor='rgba(0,0,0,0.9)'; ctx.shadowBlur=28;
-        ctx.fillText(name,W/2,H*0.46);
+        ctx.shadowColor='rgba(245,200,66,0.45)'; ctx.shadowBlur=50;
+        ctx.fillText(name,W/2,H*0.43);
         ctx.shadowBlur=0;
       }
     }
   }
 
   // ── Countdown ring on canvas ──
-  const rCX=W/2, rCY=H*0.87, rR=W*0.115;
+  const rCX=W/2, rCY=H*0.90, rR=W*0.145;
   const frac=Math.max(0,secondsLeft/timePerRaga);
   ctx.beginPath(); ctx.arc(rCX,rCY,rR,0,Math.PI*2);
-  ctx.strokeStyle='rgba(255,255,255,0.1)'; ctx.lineWidth=3; ctx.stroke();
+  ctx.strokeStyle='rgba(255,255,255,0.12)'; ctx.lineWidth=4; ctx.stroke();
   if(secondsLeft>0&&frac>0){
     const r2=Math.round(245+(230-245)*(1-frac)), g2=Math.round(200+(57-200)*(1-frac)), b2=Math.round(66+(70-66)*(1-frac));
     ctx.beginPath(); ctx.arc(rCX,rCY,rR,-Math.PI/2,-Math.PI/2+Math.PI*2*frac);
-    ctx.strokeStyle='rgb('+r2+','+g2+','+b2+')'; ctx.lineWidth=3; ctx.lineCap='round'; ctx.stroke();
+    ctx.strokeStyle='rgb('+r2+','+g2+','+b2+')'; ctx.lineWidth=4; ctx.lineCap='round'; ctx.stroke();
     ctx.lineCap='butt';
   }
   if(secondsLeft>0){
-    ctx.font='700 '+Math.round(rR*0.88)+'px "Google Sans",sans-serif';
+    ctx.font='700 '+Math.round(rR*0.92)+'px "Google Sans",sans-serif';
     ctx.fillStyle='white'; ctx.textAlign='center';
-    ctx.fillText(String(secondsLeft),rCX,rCY+rR*0.33);
+    ctx.fillText(String(secondsLeft),rCX,rCY+rR*0.35);
   }
 
   requestAnimationFrame(()=>drawLoop(video,W,H));
@@ -713,30 +731,49 @@ async function processVideo(){
     mp4Url=res.secure_url.replace(/\/upload\//, '/upload/f_mp4/').replace(/\.[^.]+$/, '.mp4');
     // Store delete token to clean up after download
     if(res.delete_token) window._cdDeleteToken=res.delete_token;
-    setConv(100,'Ready!');
+    setConv(100,'Your video is ready! 🎉');
+    document.getElementById('conv-emoji').textContent='🎉';
+    document.getElementById('conv-title').textContent='Done!';
     setTimeout(()=>{
       ov.classList.remove('active');
       const btn=document.getElementById('dl-btn');
-      btn.textContent='⬇ Download MP4';
+      const canShare=navigator.canShare&&navigator.canShare({files:[new File([],'x.mp4',{type:'video/mp4'})]});
+      btn.textContent=canShare?'📲 Share Video':'⬇ Download MP4';
       btn.disabled=false;
-    },400);
+    },800);
 
   }catch(e){
     ov.classList.remove('active');
     const btn=document.getElementById('dl-btn');
-    btn.textContent='⬇ Download Video (WebM)';
+    btn.textContent='⬇ Download Video';
     btn.disabled=false;
-    // Show error visibly for debugging
-    document.getElementById('conv-sub').textContent='Error: '+e.message;
-    document.getElementById('conv-overlay').classList.add('active');
-    document.getElementById('conv-fill').style.width='0%';
-    setTimeout(()=>document.getElementById('conv-overlay').classList.remove('active'),5000);
   }
 }
 
+const CONV_STAGES=[
+  {pct:0,  emoji:'🎬', title:'Packaging…',    sub:'Wrapping your performance'},
+  {pct:25, emoji:'☁️', title:'Uploading…',     sub:'Sending to the cloud'},
+  {pct:75, emoji:'⚡', title:'Converting…',    sub:'WebM → MP4 magic'},
+  {pct:95, emoji:'✨', title:'Almost there!',  sub:'Polishing the final cut'},
+];
 function setConv(pct,msg){
   document.getElementById('conv-fill').style.width=pct+'%';
   document.getElementById('conv-sub').textContent=msg;
+  // Update stage dots (4 stages at 0/25/75/95)
+  const thresholds=[0,25,75,95];
+  thresholds.forEach((t,i)=>{
+    const el=document.getElementById('cs'+i);
+    if(!el) return;
+    el.className='conv-stage'+(pct>t?' done':(pct===t||Math.abs(pct-t)<15)?' active-stage':'');
+  });
+  // Swap emoji + title at stage boundaries
+  for(let i=CONV_STAGES.length-1;i>=0;i--){
+    if(pct>=CONV_STAGES[i].pct){
+      document.getElementById('conv-emoji').textContent=CONV_STAGES[i].emoji;
+      document.getElementById('conv-title').textContent=CONV_STAGES[i].title;
+      break;
+    }
+  }
 }
 
 async function deleteFromCloudinary(){
@@ -751,36 +788,56 @@ async function deleteFromCloudinary(){
   }catch(e){ /* silent fail — not critical */ }
 }
 
-async function downloadVideo(){
+async function shareOrDownload(){
+  const ov=document.getElementById('conv-overlay');
+  const filename='raga-challenge-'+difficulty+'-'+Date.now()+'.mp4';
+
+  // Fetch the blob first (needed for both share and download)
+  let blob=null;
   if(mp4Url){
-    // Download the MP4 from Cloudinary
-    setConv(0,'Preparing download…');
-    document.getElementById('conv-overlay').classList.add('active');
+    setConv(0,'Fetching video…');
+    ov.classList.add('active');
     try{
       const res=await fetch(mp4Url);
-      const blob=await res.blob();
-      setConv(100,'Done!');
-      setTimeout(()=>document.getElementById('conv-overlay').classList.remove('active'),300);
-      const url=URL.createObjectURL(blob);
-      const a=document.createElement('a'); a.href=url;
-      a.download='raga-challenge-'+difficulty+'-'+Date.now()+'.mp4';
-      a.click();
-      setTimeout(()=>URL.revokeObjectURL(url),2000);
-      // Delete from Cloudinary after download — no need to store it
-      setTimeout(deleteFromCloudinary, 3000);
+      blob=await res.blob();
+      setConv(100,'Ready!');
+      setTimeout(()=>ov.classList.remove('active'),300);
+      setTimeout(deleteFromCloudinary,3000);
     }catch(e){
-      document.getElementById('conv-overlay').classList.remove('active');
+      ov.classList.remove('active');
+      // Fallback: open in new tab
       window.open(mp4Url,'_blank');
-      setTimeout(deleteFromCloudinary, 5000);
+      setTimeout(deleteFromCloudinary,5000);
+      return;
     }
   } else if(finalBlob){
-    const url=URL.createObjectURL(finalBlob);
-    const a=document.createElement('a'); a.href=url;
-    a.download='raga-challenge-'+difficulty+'-'+Date.now()+'.webm';
-    a.click(); setTimeout(()=>URL.revokeObjectURL(url),2000);
+    blob=finalBlob;
   } else {
     alert('No recording found. Please record first!');
+    return;
   }
+
+  const file=new File([blob], filename, {type:'video/mp4'});
+
+  // Try Web Share API (works on mobile Safari + Android Chrome)
+  if(navigator.canShare && navigator.canShare({files:[file]})){
+    try{
+      await navigator.share({
+        files:[file],
+        title:'My Raga Challenge',
+        text:'I just completed a Carnatic Raga Challenge! 🎶 #RagaChallenge #Carnatic'
+      });
+      return;
+    }catch(e){
+      if(e.name==='AbortError') return; // user cancelled — don't fall through to download
+    }
+  }
+
+  // Fallback: plain download
+  const url=URL.createObjectURL(blob);
+  const a=document.createElement('a'); a.href=url;
+  a.download=filename; a.click();
+  setTimeout(()=>URL.revokeObjectURL(url),2000);
 }
 
 function restart(){
@@ -796,6 +853,48 @@ function showScreen(id){
   document.querySelectorAll('.screen').forEach(s=>s.classList.remove('active'));
   document.getElementById(id).classList.add('active');
 }
+
+// Long-press "Hold to End" button
+(function(){
+  const HOLD_MS=1500;
+  const btn=document.getElementById('end-btn');
+  const fill=document.getElementById('end-btn-fill');
+  let timer=null, startTs=0, raf=null;
+
+  function startHold(e){
+    e.preventDefault();
+    startTs=Date.now();
+    fill.style.transition='none';
+    fill.style.transform='scaleX(0)';
+
+    function animFill(){
+      const pct=Math.min((Date.now()-startTs)/HOLD_MS,1);
+      fill.style.transform='scaleX('+pct+')';
+      if(pct<1) raf=requestAnimationFrame(animFill);
+    }
+    raf=requestAnimationFrame(animFill);
+
+    timer=setTimeout(()=>{
+      cancelAnimationFrame(raf);
+      fill.style.transform='scaleX(1)';
+      stopChallenge();
+    }, HOLD_MS);
+  }
+
+  function cancelHold(){
+    clearTimeout(timer);
+    cancelAnimationFrame(raf);
+    fill.style.transition='transform 0.3s ease';
+    fill.style.transform='scaleX(0)';
+  }
+
+  btn.addEventListener('mousedown', startHold);
+  btn.addEventListener('touchstart', startHold, {passive:false});
+  btn.addEventListener('mouseup', cancelHold);
+  btn.addEventListener('mouseleave', cancelHold);
+  btn.addEventListener('touchend', cancelHold);
+  btn.addEventListener('touchcancel', cancelHold);
+})();
 </script>
 
 </body>

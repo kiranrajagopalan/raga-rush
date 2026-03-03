@@ -644,15 +644,20 @@ function drawLoop(video,W,H){
   ctx.fillRect(0,0,W,TOP_H);
   ctx.fillRect(0,BOT_Y,W,BOT_H);
 
-  // ── Video: fill camera section only (cover logic, offset to middle section) ──
+  // ── Video: fill camera section only (cover logic, clipped to middle section) ──
   const vw=video.videoWidth||W, vh=video.videoHeight||MID_H;
   const scale=Math.max(W/vw, MID_H/vh);
   const sw=vw*scale, sh=vh*scale;
   const ox=(W-sw)/2, oy=TOP_H+(MID_H-sh)/2;
   ctx.save();
+  ctx.beginPath(); ctx.rect(0,TOP_H,W,MID_H); ctx.clip(); // mirror DOM overflow:hidden
   ctx.translate(W,0); ctx.scale(-1,1);
   ctx.drawImage(video,ox,oy,sw,sh);
   ctx.restore();
+  // Reinforce black fills over any bleed
+  ctx.fillStyle='#000';
+  ctx.fillRect(0,0,W,TOP_H);
+  ctx.fillRect(0,BOT_Y,W,BOT_H);
 
   // ── Gradient overlays (constrained to camera section) ──
   let g=ctx.createLinearGradient(0,TOP_H,0,TOP_H+MID_H*0.35);

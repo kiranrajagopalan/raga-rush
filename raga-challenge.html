@@ -219,6 +219,8 @@ html, body {
 .conv-stage.done { background:var(--gold); }
 .conv-stage.active-stage { background:white; animation:stagePulse 0.7s ease-in-out infinite; }
 @keyframes stagePulse { 0%,100%{opacity:1} 50%{opacity:0.3} }
+.conv-skip { background:transparent; border:1px solid rgba(255,255,255,0.2); color:rgba(255,255,255,0.45); padding:10px 24px; border-radius:10px; font-family:var(--font); font-size:13px; font-weight:500; cursor:pointer; margin-top:6px; transition:all 0.2s; }
+.conv-skip:hover { border-color:white; color:white; }
 </style>
 </head>
 <body>
@@ -332,6 +334,7 @@ html, body {
         <div class="conv-stage" id="cs2"></div>
         <div class="conv-stage" id="cs3"></div>
       </div>
+      <button class="conv-skip" id="conv-skip" onclick="skipToWebm()" style="display:none">Skip → Save WebM</button>
     </div>
     <div class="done-icon">🎶</div>
     <div class="done-title">Incredible!</div>
@@ -672,38 +675,58 @@ function drawLoop(video,W,H){
   requestAnimationFrame(()=>drawLoop(video,W,H));
 }
 
-function stopRecording(){
-  if(!isRecording) return;
+function stopRecording(onStopped){
+  if(!isRecording){ onStopped&&onStopped(); return; }
   drawRunning=false; isRecording=false;
-  mediaRecorder.stop();
   document.getElementById('rec-badge').classList.remove('visible');
+  mediaRecorder.onstop=()=>{ onStopped&&onStopped(); };
+  mediaRecorder.stop();
 }
 
-function stopChallenge(){ clearInterval(cdInterval); if(isRecording) stopRecording(); endChallenge(); }
+function stopChallenge(){ clearInterval(cdInterval); endChallenge(); }
 
 function endChallenge(){
-  clearInterval(cdInterval); if(isRecording) stopRecording();
+  clearInterval(cdInterval);
   const elapsed=startTime?Math.round((Date.now()-startTime)/1000):ragaCount*timePerRaga;
   document.getElementById('stat-ragas').textContent=currentIdx;
   document.getElementById('stat-time').textContent=elapsed+'s';
   document.getElementById('stat-diff').textContent=difficulty[0].toUpperCase()+difficulty.slice(1);
-  setTimeout(()=>{ showScreen('done-screen'); processVideo(); },600);
+  // Wait for MediaRecorder to finish flushing all chunks before processing
+  stopRecording(()=>{
+    showScreen('done-screen');
+    processVideo();
+  });
 }
 
 const CLOUDINARY_CLOUD='dfstch1ag';
 const CLOUDINARY_PRESET='forRagaChallange';
 let mp4Url=null;
 
+function skipToWebm(){
+  document.getElementById('conv-overlay').classList.remove('active');
+  const btn=document.getElementById('dl-btn');
+  btn.textContent='⬇ Save WebM';
+  btn.disabled=false;
+  mp4Url=null; // force WebM path in shareOrDownload
+}
+
 async function processVideo(){
   if(chunks.length===0){
-    document.getElementById('dl-btn').textContent='No recording found';
+    document.getElementById('dl-btn').textContent='⬇ Save WebM';
+    document.getElementById('dl-btn').disabled=false;
     return;
   }
   finalBlob=new Blob(chunks,{type:'video/webm'});
 
   const ov=document.getElementById('conv-overlay');
   ov.classList.add('active');
+  document.getElementById('conv-skip').style.display='none';
   setConv(5,'Uploading video…');
+
+  // Show escape hatch after 8s in case upload is slow
+  const skipTimer=setTimeout(()=>{
+    document.getElementById('conv-skip').style.display='block';
+  }, 8000);
 
   try{
     const fd=new FormData();
@@ -717,13 +740,17 @@ async function processVideo(){
       if(e.lengthComputable) setConv(5+Math.round((e.loaded/e.total)*75),'Uploading…');
     };
 
+    xhr.timeout=90000;
     const res=await new Promise((resolve,reject)=>{
       xhr.onload=()=>{
-        const data=JSON.parse(xhr.responseText);
-        if(xhr.status===200) resolve(data);
-        else reject(new Error((data.error&&data.error.message)||('HTTP '+xhr.status)));
+        try{
+          const data=JSON.parse(xhr.responseText);
+          if(xhr.status===200) resolve(data);
+          else reject(new Error((data.error&&data.error.message)||('HTTP '+xhr.status)));
+        }catch(e){ reject(new Error('Bad response from server')); }
       };
       xhr.onerror=()=>reject(new Error('Network error'));
+      xhr.ontimeout=()=>reject(new Error('Upload timed out'));
       xhr.send(fd);
     });
 
@@ -731,6 +758,7 @@ async function processVideo(){
     mp4Url=res.secure_url.replace(/\/upload\//, '/upload/f_mp4/').replace(/\.[^.]+$/, '.mp4');
     // Store delete token to clean up after download
     if(res.delete_token) window._cdDeleteToken=res.delete_token;
+    clearTimeout(skipTimer);
     setConv(100,'Your video is ready! 🎉');
     document.getElementById('conv-emoji').textContent='🎉';
     document.getElementById('conv-title').textContent='Done!';
@@ -743,10 +771,12 @@ async function processVideo(){
     },800);
 
   }catch(e){
+    clearTimeout(skipTimer);
     ov.classList.remove('active');
     const btn=document.getElementById('dl-btn');
-    btn.textContent='⬇ Download Video';
+    btn.textContent='⬇ Save WebM';
     btn.disabled=false;
+    mp4Url=null;
   }
 }
 

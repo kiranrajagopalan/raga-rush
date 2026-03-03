@@ -221,6 +221,19 @@ html, body {
 @keyframes stagePulse { 0%,100%{opacity:1} 50%{opacity:0.3} }
 .conv-skip { background:transparent; border:1px solid rgba(255,255,255,0.2); color:rgba(255,255,255,0.45); padding:10px 24px; border-radius:10px; font-family:var(--font); font-size:13px; font-weight:500; cursor:pointer; margin-top:6px; transition:all 0.2s; }
 .conv-skip:hover { border-color:white; color:white; }
+
+/* ── RESULTS SCREEN ── */
+#results-screen { background:radial-gradient(ellipse at 50% 0%,#1a1000 0%,#000 70%); padding:6% 8%; gap:0; flex-direction:column; align-items:center; justify-content:flex-start; overflow-y:auto; }
+.results-eyebrow { font-size:11px; letter-spacing:5px; text-transform:uppercase; color:var(--gold); margin-top:8%; margin-bottom:8px; font-weight:500; }
+.results-title { font-size:clamp(28px,8vw,40px); font-weight:700; color:white; margin-bottom:5%; text-align:center; }
+.results-list { width:100%; list-style:none; padding:0; margin:0 0 5% 0; }
+.results-list li { display:flex; align-items:center; gap:12px; padding:10px 14px; border-bottom:1px solid rgba(255,255,255,0.06); opacity:0; transform:translateY(12px); animation:resultFadeIn 0.4s ease forwards; }
+.results-list li .raga-num { font-size:13px; font-weight:700; color:var(--gold); min-width:28px; text-align:center; }
+.results-list li .raga-text { font-size:16px; font-weight:500; color:rgba(255,255,255,0.85); }
+@keyframes resultFadeIn { to { opacity:1; transform:translateY(0); } }
+.results-stats { display:flex; gap:3%; width:100%; margin-bottom:5%; }
+#get-video-btn { width:100%; padding:5%; background:var(--gold); color:#000; border:none; border-radius:14px; font-family:var(--font); font-size:18px; font-weight:700; cursor:pointer; box-shadow:0 8px 32px rgba(245,200,66,0.45); transition:transform 0.15s; margin-top:auto; margin-bottom:4%; }
+#get-video-btn:hover { transform:translateY(-2px); }
 </style>
 </head>
 <body>
@@ -275,9 +288,6 @@ html, body {
       <button id="start-rec-btn" onclick="beginCountdown()">&#9210; Start Recording</button>
       <button class="preview-back" onclick="goBack()">&#8592; Change settings</button>
     </div>
-    <div id="go-countdown">
-      <div id="go-num">3</div>
-    </div>
   </div>
 
   <!-- CHALLENGE -->
@@ -321,6 +331,19 @@ html, body {
     <div id="flash"></div>
   </div>
 
+  <!-- RESULTS -->
+  <div id="results-screen" class="screen">
+    <div class="results-eyebrow">Challenge Complete</div>
+    <div class="results-title">Your Ragas</div>
+    <ol class="results-list" id="results-list"></ol>
+    <div class="results-stats">
+      <div class="stat-box"><div class="stat-num" id="res-stat-ragas">0</div><div class="stat-label">Ragas</div></div>
+      <div class="stat-box"><div class="stat-num" id="res-stat-time">0s</div><div class="stat-label">Duration</div></div>
+      <div class="stat-box"><div class="stat-num" id="res-stat-diff">—</div><div class="stat-label">Level</div></div>
+    </div>
+    <button id="get-video-btn" onclick="goToDoneScreen()">Get Your Video &rarr;</button>
+  </div>
+
   <!-- DONE -->
   <div id="done-screen" class="screen">
     <div id="conv-overlay">
@@ -348,6 +371,11 @@ html, body {
     <button class="restart-btn" onclick="restart()">New Challenge</button>
   </div>
 
+  <!-- 3-2-1 COUNTDOWN (overlays any screen) -->
+  <div id="go-countdown">
+    <div id="go-num">3</div>
+  </div>
+
 </div>
 <script>
 const RAGAS = {
@@ -362,6 +390,8 @@ let mediaStream=null, mediaRecorder=null, chunks=[];
 let isRecording=false, startTime=null;
 let recCanvas=null, recCtx=null, drawRunning=false;
 let finalBlob=null;
+let countdownActive=false, countdownText='';
+let challengeElapsed=0, mp4Blob=null, uploadFailed=false;
 
 const CIRC = 2*Math.PI*44;
 document.getElementById('ring-progress').style.strokeDasharray = CIRC;
@@ -412,6 +442,17 @@ function goBack(){
 function beginCountdown(){
   const btn=document.getElementById('start-rec-btn');
   btn.disabled=true;
+
+  // Switch to camera-screen FIRST so video feed is visible during countdown
+  showScreen('camera-screen');
+  document.getElementById('diff-badge').textContent=difficulty[0].toUpperCase()+difficulty.slice(1);
+  document.getElementById('raga-counter').textContent='0 / '+ragaCount;
+
+  // Start recording immediately — countdown gets baked into the video
+  startRecording();
+  countdownActive=true;
+
+  // Show DOM countdown overlay
   const overlay=document.getElementById('go-countdown');
   const numEl=document.getElementById('go-num');
   overlay.classList.add('active');
@@ -420,24 +461,19 @@ function beginCountdown(){
   let i=0;
 
   function tick(){
+    countdownText=steps[i];
     numEl.textContent=steps[i];
     numEl.classList.toggle('go-text', steps[i]==='GO!');
-    // Retrigger animation
     numEl.style.animation='none';
     void numEl.offsetWidth;
     numEl.style.animation='';
 
     if(i===steps.length-1){
-      // On GO — start recording then launch challenge after brief moment
       setTimeout(()=>{
         overlay.classList.remove('active');
-        // Switch to challenge screen
-        showScreen('camera-screen');
-        document.getElementById('diff-badge').textContent=difficulty[0].toUpperCase()+difficulty.slice(1);
-        document.getElementById('raga-counter').textContent='0 / '+ragaCount;
-        // Start recording immediately
-        startRecording();
-        // Start challenge
+        countdownActive=false;
+        countdownText='';
+        document.getElementById('rec-badge').classList.add('visible');
         setupChallenge();
         btn.disabled=false;
       }, 500);
@@ -554,7 +590,6 @@ function startRecording(){
   isRecording=true; drawRunning=true;
   mediaRecorder.start(100); startTime=Date.now();
   drawLoop(video,W,H);
-  document.getElementById('rec-badge').classList.add('visible');
 }
 
 function drawLoop(video,W,H){
@@ -580,6 +615,22 @@ function drawLoop(video,W,H){
   g=ctx.createLinearGradient(0,H*0.64,0,H);
   g.addColorStop(0,'rgba(0,0,0,0)'); g.addColorStop(1,'rgba(0,0,0,0.88)');
   ctx.fillStyle=g; ctx.fillRect(0,H*0.64,W,H*0.36);
+
+  // ── 3-2-1-GO countdown (baked into recording) ──
+  if(countdownActive && countdownText){
+    ctx.fillStyle='rgba(0,0,0,0.5)';
+    ctx.fillRect(0,0,W,H);
+    const isGo=countdownText==='GO!';
+    const cdFS=isGo?Math.round(W*0.22):Math.round(W*0.36);
+    ctx.font='700 '+cdFS+'px "Google Sans",sans-serif';
+    ctx.fillStyle=isGo?'#F5C842':'white';
+    ctx.textAlign='center'; ctx.textBaseline='middle';
+    ctx.shadowColor='rgba(245,200,66,0.6)'; ctx.shadowBlur=60;
+    ctx.fillText(countdownText,W/2,H/2);
+    ctx.shadowBlur=0; ctx.textBaseline='alphabetic';
+    requestAnimationFrame(()=>drawLoop(video,W,H));
+    return;
+  }
 
   const topY=H*0.1;
   const fs=s=>Math.round(W*s);
@@ -687,15 +738,50 @@ function stopChallenge(){ clearInterval(cdInterval); endChallenge(); }
 
 function endChallenge(){
   clearInterval(cdInterval);
-  const elapsed=startTime?Math.round((Date.now()-startTime)/1000):ragaCount*timePerRaga;
-  document.getElementById('stat-ragas').textContent=currentIdx;
-  document.getElementById('stat-time').textContent=elapsed+'s';
-  document.getElementById('stat-diff').textContent=difficulty[0].toUpperCase()+difficulty.slice(1);
-  // Wait for MediaRecorder to finish flushing all chunks before processing
+  challengeElapsed=startTime?Math.round((Date.now()-startTime)/1000):ragaCount*timePerRaga;
   stopRecording(()=>{
-    showScreen('done-screen');
-    processVideo();
+    showResultsScreen();
+    processVideoInBackground();
   });
+}
+
+function showResultsScreen(){
+  document.getElementById('res-stat-ragas').textContent=currentIdx;
+  document.getElementById('res-stat-time').textContent=challengeElapsed+'s';
+  document.getElementById('res-stat-diff').textContent=difficulty[0].toUpperCase()+difficulty.slice(1);
+  const list=document.getElementById('results-list');
+  list.innerHTML='';
+  const presented=ragaList.slice(0,currentIdx);
+  presented.forEach((raga,i)=>{
+    const li=document.createElement('li');
+    li.style.animationDelay=(i*0.08)+'s';
+    li.innerHTML='<span class="raga-num">'+(i+1)+'</span><span class="raga-text">'+raga+'</span>';
+    list.appendChild(li);
+  });
+  showScreen('results-screen');
+}
+
+function goToDoneScreen(){
+  document.getElementById('stat-ragas').textContent=currentIdx;
+  document.getElementById('stat-time').textContent=challengeElapsed+'s';
+  document.getElementById('stat-diff').textContent=difficulty[0].toUpperCase()+difficulty.slice(1);
+  showScreen('done-screen');
+  if(mp4Blob){
+    enableDownloadButton();
+  } else if(uploadFailed){
+    const btn=document.getElementById('dl-btn');
+    btn.textContent='⬇ Save WebM';
+    btn.disabled=false;
+  } else {
+    document.getElementById('conv-overlay').classList.add('active');
+  }
+}
+
+function enableDownloadButton(){
+  const btn=document.getElementById('dl-btn');
+  const canShare=navigator.canShare&&navigator.canShare({files:[new File([],'x.mp4',{type:'video/mp4'})]});
+  btn.textContent=canShare?'📲 Share Video':'⬇ Download MP4';
+  btn.disabled=false;
 }
 
 const CLOUDINARY_CLOUD='dfstch1ag';
@@ -707,23 +793,26 @@ function skipToWebm(){
   const btn=document.getElementById('dl-btn');
   btn.textContent='⬇ Save WebM';
   btn.disabled=false;
-  mp4Url=null; // force WebM path in shareOrDownload
+  mp4Url=null; mp4Blob=null;
 }
 
-async function processVideo(){
+async function processVideoInBackground(){
   if(chunks.length===0){
-    document.getElementById('dl-btn').textContent='⬇ Save WebM';
-    document.getElementById('dl-btn').disabled=false;
+    uploadFailed=true;
     return;
   }
   finalBlob=new Blob(chunks,{type:'video/webm'});
+  uploadFailed=false;
 
   const ov=document.getElementById('conv-overlay');
-  ov.classList.add('active');
-  document.getElementById('conv-skip').style.display='none';
+  const isOnDone=()=>document.getElementById('done-screen').classList.contains('active');
+
+  if(isOnDone()){
+    ov.classList.add('active');
+    document.getElementById('conv-skip').style.display='none';
+  }
   setConv(5,'Uploading video…');
 
-  // Show escape hatch after 8s in case upload is slow
   const skipTimer=setTimeout(()=>{
     document.getElementById('conv-skip').style.display='block';
   }, 8000);
@@ -737,7 +826,7 @@ async function processVideo(){
     xhr.open('POST','https://api.cloudinary.com/v1_1/'+CLOUDINARY_CLOUD+'/video/upload');
 
     xhr.upload.onprogress=e=>{
-      if(e.lengthComputable) setConv(5+Math.round((e.loaded/e.total)*75),'Uploading…');
+      if(e.lengthComputable) setConv(5+Math.round((e.loaded/e.total)*60),'Uploading…');
     };
 
     xhr.timeout=90000;
@@ -754,29 +843,36 @@ async function processVideo(){
       xhr.send(fd);
     });
 
-    // Cloudinary can serve any video as mp4 via URL — just swap the extension
     mp4Url=res.secure_url.replace(/\/upload\//, '/upload/f_mp4/').replace(/\.[^.]+$/, '.mp4');
-    // Store delete token to clean up after download
     if(res.delete_token) window._cdDeleteToken=res.delete_token;
+
+    // Fetch MP4 blob immediately (eliminates second overlay)
+    setConv(70,'Fetching MP4…');
+    const fetchRes=await fetch(mp4Url);
+    mp4Blob=await fetchRes.blob();
+
     clearTimeout(skipTimer);
-    setConv(100,'Your video is ready! 🎉');
+    setConv(100,'Your video is ready!');
     document.getElementById('conv-emoji').textContent='🎉';
     document.getElementById('conv-title').textContent='Done!';
-    setTimeout(()=>{
-      ov.classList.remove('active');
-      const btn=document.getElementById('dl-btn');
-      const canShare=navigator.canShare&&navigator.canShare({files:[new File([],'x.mp4',{type:'video/mp4'})]});
-      btn.textContent=canShare?'📲 Share Video':'⬇ Download MP4';
-      btn.disabled=false;
-    },800);
+
+    if(isOnDone()){
+      setTimeout(()=>{
+        ov.classList.remove('active');
+        enableDownloadButton();
+      },800);
+    }
 
   }catch(e){
     clearTimeout(skipTimer);
-    ov.classList.remove('active');
-    const btn=document.getElementById('dl-btn');
-    btn.textContent='⬇ Save WebM';
-    btn.disabled=false;
-    mp4Url=null;
+    uploadFailed=true;
+    mp4Url=null; mp4Blob=null;
+    if(isOnDone()){
+      ov.classList.remove('active');
+      const btn=document.getElementById('dl-btn');
+      btn.textContent='⬇ Save WebM';
+      btn.disabled=false;
+    }
   }
 }
 
@@ -819,35 +915,13 @@ async function deleteFromCloudinary(){
 }
 
 async function shareOrDownload(){
-  const ov=document.getElementById('conv-overlay');
-  const filename='raga-challenge-'+difficulty+'-'+Date.now()+'.mp4';
-
-  // Fetch the blob first (needed for both share and download)
-  let blob=null;
-  if(mp4Url){
-    setConv(0,'Fetching video…');
-    ov.classList.add('active');
-    try{
-      const res=await fetch(mp4Url);
-      blob=await res.blob();
-      setConv(100,'Ready!');
-      setTimeout(()=>ov.classList.remove('active'),300);
-      setTimeout(deleteFromCloudinary,3000);
-    }catch(e){
-      ov.classList.remove('active');
-      // Fallback: open in new tab
-      window.open(mp4Url,'_blank');
-      setTimeout(deleteFromCloudinary,5000);
-      return;
-    }
-  } else if(finalBlob){
-    blob=finalBlob;
-  } else {
-    alert('No recording found. Please record first!');
-    return;
-  }
-
-  const file=new File([blob], filename, {type:'video/mp4'});
+  const blob=mp4Blob||finalBlob;
+  if(!blob){ alert('No recording found.'); return; }
+  const isMp4=!!mp4Blob;
+  const ext=isMp4?'.mp4':'.webm';
+  const mime=isMp4?'video/mp4':'video/webm';
+  const filename='raga-challenge-'+difficulty+'-'+Date.now()+ext;
+  const file=new File([blob], filename, {type:mime});
 
   // Try Web Share API (works on mobile Safari + Android Chrome)
   if(navigator.canShare && navigator.canShare({files:[file]})){
@@ -855,11 +929,12 @@ async function shareOrDownload(){
       await navigator.share({
         files:[file],
         title:'My Raga Challenge',
-        text:'I just completed a Carnatic Raga Challenge! 🎶 #RagaChallenge #Carnatic'
+        text:'I just completed a Carnatic Raga Challenge! #RagaChallenge #Carnatic'
       });
+      setTimeout(deleteFromCloudinary,3000);
       return;
     }catch(e){
-      if(e.name==='AbortError') return; // user cancelled — don't fall through to download
+      if(e.name==='AbortError') return;
     }
   }
 
@@ -868,14 +943,19 @@ async function shareOrDownload(){
   const a=document.createElement('a'); a.href=url;
   a.download=filename; a.click();
   setTimeout(()=>URL.revokeObjectURL(url),2000);
+  setTimeout(deleteFromCloudinary,3000);
 }
 
 function restart(){
   if(mediaStream){ mediaStream.getTracks().forEach(t=>t.stop()); mediaStream=null; }
   document.getElementById('preview-video').srcObject=null;
   document.getElementById('video-bg').srcObject=null;
-  chunks=[]; finalBlob=null; mp4Url=null;
+  chunks=[]; finalBlob=null; mp4Url=null; mp4Blob=null;
   isRecording=false; drawRunning=false; currentIdx=0;
+  countdownActive=false; countdownText='';
+  challengeElapsed=0; uploadFailed=false;
+  document.getElementById('dl-btn').textContent='⏳ Preparing…';
+  document.getElementById('dl-btn').disabled=true;
   showScreen('setup-screen');
 }
 

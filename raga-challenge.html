@@ -409,9 +409,12 @@ let mediaStream=null, mediaRecorder=null, chunks=[];
 let isRecording=false, startTime=null;
 let recCanvas=null, recCtx=null, drawRunning=false;
 let finalBlob=null;
+let _cdDeleteToken=null; // kept private — not on window
 let countdownActive=false, countdownText='';
 let challengeElapsed=0, mp4Blob=null, uploadFailed=false;
 let endCardActive=false, endCardStart=0;
+
+window.addEventListener('beforeunload',()=>{ if(mediaStream) mediaStream.getTracks().forEach(t=>t.stop()); });
 
 const CIRC = 2*Math.PI*44;
 document.getElementById('ring-progress').style.strokeDasharray = CIRC;
@@ -541,7 +544,8 @@ function runSlotMachine(target, onDone){
   for(let i=0;i<20;i++) items.push(pool[Math.floor(Math.random()*pool.length)]);
   items.push(target);
   const ITEM_H=64;
-  inner.innerHTML=items.map(n=>'<div class="slot-item">'+n+'</div>').join('');
+  inner.innerHTML='';
+  items.forEach(n=>{ const d=document.createElement('div'); d.className='slot-item'; d.textContent=n; inner.appendChild(d); });
   wrap.classList.add('active');
   const totalDist=(items.length-1)*ITEM_H;  // 1280px
   const finalY=-totalDist;
@@ -889,7 +893,9 @@ function showResultsScreen(){
   presented.forEach((raga,i)=>{
     const li=document.createElement('li');
     li.style.animationDelay=(i*0.08)+'s';
-    li.innerHTML='<span class="raga-num">'+(i+1)+'</span><span class="raga-text">'+raga+'</span>';
+    const rn=document.createElement('span'); rn.className='raga-num'; rn.textContent=i+1;
+    const rt=document.createElement('span'); rt.className='raga-text'; rt.textContent=raga;
+    li.append(rn,rt);
     list.appendChild(li);
   });
   showScreen('results-screen');
@@ -978,7 +984,7 @@ async function processVideoInBackground(){
     });
 
     mp4Url=res.secure_url.replace(/\/upload\//, '/upload/f_mp4/').replace(/\.[^.]+$/, '.mp4');
-    if(res.delete_token) window._cdDeleteToken=res.delete_token;
+    if(res.delete_token) _cdDeleteToken=res.delete_token;
 
     // Fetch MP4 blob immediately (eliminates second overlay)
     setConv(70,'Fetching MP4…');
@@ -1037,14 +1043,14 @@ function setConv(pct,msg){
 }
 
 async function deleteFromCloudinary(){
-  if(!window._cdDeleteToken) return;
+  if(!_cdDeleteToken) return;
   try{
     await fetch('https://api.cloudinary.com/v1_1/'+CLOUDINARY_CLOUD+'/delete_by_token',{
       method:'POST',
       headers:{'Content-Type':'application/json'},
-      body:JSON.stringify({token:window._cdDeleteToken})
+      body:JSON.stringify({token:_cdDeleteToken})
     });
-    window._cdDeleteToken=null;
+    _cdDeleteToken=null;
   }catch(e){ /* silent fail — not critical */ }
 }
 

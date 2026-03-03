@@ -130,50 +130,23 @@ html, body {
 }
 
 /* ── CAMERA SCREEN ── */
-#camera-screen { background:#000; display:flex; flex-direction:column; height:100%; }
-
-/* TOP SECTION (15%) */
-.cam-section-top {
-  flex: 0 0 15%;
-  background:linear-gradient(to bottom,rgba(0,0,0,0.85) 0%,rgba(0,0,0,0.3) 100%);
-  display:flex; align-items:center; justify-content:space-between;
-  padding:0 6%; z-index:10;
-}
+#camera-screen { background:#000; }
+#video-bg { position:absolute; inset:0; width:100%; height:100%; object-fit:cover; transform:scaleX(-1); }
+.cam-overlay-top { position:absolute; top:0; left:0; right:0; height:25%; background:linear-gradient(to bottom,rgba(0,0,0,0.8) 0%,transparent 100%); pointer-events:none; }
+.cam-overlay-bottom { position:absolute; bottom:0; left:0; right:0; height:35%; background:linear-gradient(to top,rgba(0,0,0,0.88) 0%,transparent 100%); pointer-events:none; }
+#top-bar { position:absolute; top:0; left:0; right:0; padding:6% 7% 0; display:flex; align-items:center; justify-content:space-between; z-index:10; }
 .raga-counter { font-size:13px; letter-spacing:1px; color:rgba(255,255,255,0.75); font-weight:500; }
 .difficulty-badge { font-size:10px; letter-spacing:2px; text-transform:uppercase; padding:4px 12px; border-radius:20px; border:1px solid var(--glass-border); background:var(--glass); backdrop-filter:blur(8px); color:var(--gold); font-weight:500; }
-#rec-badge { display:flex; align-items:center; gap:6px; font-size:11px; letter-spacing:2px; color:var(--red); opacity:0; transition:opacity 0.3s; font-weight:500; }
+#rec-badge { position:absolute; top:6%; left:50%; transform:translateX(-50%); display:flex; align-items:center; gap:6px; font-size:11px; letter-spacing:2px; color:var(--red); opacity:0; transition:opacity 0.3s; font-weight:500; }
 #rec-badge.visible { opacity:1; }
 .rec-dot { width:7px; height:7px; border-radius:50%; background:var(--red); animation:blink 1s infinite; }
 @keyframes blink { 0%,100%{opacity:1} 50%{opacity:0.1} }
-
-/* MIDDLE SECTION (~55%) */
-.cam-section-middle {
-  flex: 0 0 55%;
-  display:flex; align-items:center; justify-content:center;
-  padding:12px 16px;
-}
-.video-wrapper {
-  width:100%; height:100%;
-  border-radius:18px; overflow:hidden;
-  box-shadow:0 4px 16px rgba(0,0,0,0.4);
-  display:flex; align-items:center; justify-content:center;
-}
-#video-bg { width:100%; height:100%; object-fit:cover; transform:scaleX(-1); }
-
-/* BOTTOM SECTION (30%) */
-.cam-section-bottom {
-  flex: 0 0 30%;
-  background:linear-gradient(to top,rgba(0,0,0,0.88) 0%,rgba(0,0,0,0.2) 100%);
-  display:flex; flex-direction:column; align-items:center; justify-content:flex-start;
-  padding:8px 0 4% 0; z-index:5; overflow-y:auto;
-}
 
 /* ── SLOT MACHINE ── */
 #slot-wrap {
   position:absolute; inset:0; z-index:20;
   background:rgba(0,0,0,0.65); backdrop-filter:blur(8px);
   display:none; flex-direction:column; align-items:center; justify-content:center;
-  border-radius:inherit;
 }
 #slot-wrap.active { display:flex; }
 #slot-window { width:88%; height:192px; overflow:hidden; position:relative; display:flex; align-items:center; justify-content:center; }
@@ -189,20 +162,20 @@ html, body {
 .slot-hint { margin-top:18px; font-size:11px; letter-spacing:3px; color:rgba(255,255,255,0.45); text-transform:uppercase; font-weight:400; }
 
 /* ── RAGA DISPLAY ── */
-#raga-display { display:flex; flex-direction:column; align-items:center; pointer-events:none; z-index:5; opacity:0; transition:opacity 0.4s; margin:8px 0; }
+#raga-display { position:absolute; left:0; right:0; top:40%; transform:translateY(-50%); display:flex; flex-direction:column; align-items:center; pointer-events:none; z-index:5; opacity:0; transition:opacity 0.4s; }
 #raga-display.visible { opacity:1; }
-#raga-label { font-size:11px; letter-spacing:5px; text-transform:uppercase; color:var(--gold); margin-bottom:8px; font-weight:500; }
-#raga-name { font-size:clamp(32px,12vw,56px); line-height:1.05; text-align:center; color:white; text-shadow:0 0 60px rgba(245,200,66,0.45), 0 4px 40px rgba(0,0,0,0.9); padding:0 4%; font-weight:700; }
+#raga-label { font-size:11px; letter-spacing:5px; text-transform:uppercase; color:var(--gold); margin-bottom:12px; font-weight:500; }
+#raga-name { font-size:clamp(52px,16vw,88px); line-height:1.05; text-align:center; color:white; text-shadow:0 0 60px rgba(245,200,66,0.45), 0 4px 40px rgba(0,0,0,0.9); padding:0 4%; font-weight:700; }
 #raga-name.reveal { animation:ragaReveal 0.7s cubic-bezier(0.34,1.56,0.64,1); }
 @keyframes ragaReveal { 0%{transform:scale(0.4) translateY(30px);opacity:0;filter:blur(12px)} 100%{transform:scale(1) translateY(0);opacity:1;filter:blur(0)} }
 
 /* countdown ring */
-#countdown-wrap { display:flex; align-items:center; justify-content:center; z-index:5; margin:6px 0; }
-.ring-container { position:relative; width:clamp(80px,22vw,100px); height:clamp(80px,22vw,100px); }
+#countdown-wrap { position:absolute; bottom:8%; left:50%; transform:translateX(-50%); z-index:5; }
+.ring-container { position:relative; width:clamp(100px,28vw,130px); height:clamp(100px,28vw,130px); }
 #ring-svg { width:100%; height:100%; transform:rotate(-90deg); }
 #ring-bg  { fill:none; stroke:rgba(255,255,255,0.12); stroke-width:5; }
 #ring-progress { fill:none; stroke:var(--gold); stroke-width:5; stroke-linecap:round; transition:stroke-dashoffset 0.15s linear; }
-#countdown-num { position:absolute; inset:0; display:flex; align-items:center; justify-content:center; font-size:clamp(26px,8vw,36px); font-weight:700; }
+#countdown-num { position:absolute; inset:0; display:flex; align-items:center; justify-content:center; font-size:clamp(34px,11vw,48px); font-weight:700; }
 
 /* particles */
 #reveal-particles { position:absolute; inset:0; pointer-events:none; overflow:hidden; z-index:6; }
@@ -210,7 +183,7 @@ html, body {
 @keyframes pBurst { 0%{transform:translate(0,0) scale(1);opacity:1} 100%{transform:translate(var(--tx),var(--ty)) scale(0);opacity:0} }
 
 /* bottom controls */
-#bottom-controls { display:flex; gap:4%; padding:0 7%; z-index:10; width:100%; margin-top:auto; }
+#bottom-controls { position:absolute; bottom:4%; left:0; right:0; display:flex; gap:4%; padding:0 7%; z-index:10; }
 .ctrl-btn { flex:1; padding:4.5% 0; border-radius:12px; border:1px solid var(--glass-border); background:var(--glass); color:white; font-family:var(--font); font-size:15px; font-weight:600; cursor:pointer; backdrop-filter:blur(12px); transition:all 0.2s; position:relative; overflow:hidden; user-select:none; -webkit-user-select:none; }
 .ctrl-btn.primary { background:var(--red); border-color:var(--red); box-shadow:0 4px 20px rgba(230,57,70,0.5); }
 .ctrl-btn:active { transform:scale(0.97); }
@@ -319,53 +292,42 @@ html, body {
 
   <!-- CHALLENGE -->
   <div id="camera-screen" class="screen">
-
-    <!-- TOP SECTION (15%) - Stats & Badges -->
-    <div class="cam-section-top">
+    <video id="video-bg" autoplay muted playsinline></video>
+    <div class="cam-overlay-top"></div>
+    <div class="cam-overlay-bottom"></div>
+    <div id="slot-wrap">
+      <div id="slot-window">
+        <div class="sel-line top"></div>
+        <div class="sel-line bot"></div>
+        <div id="slot-inner"></div>
+      </div>
+      <div class="slot-hint">Picking your Raga…</div>
+    </div>
+    <div id="raga-display">
+      <div id="raga-label">Now Sing</div>
+      <div id="raga-name">—</div>
+    </div>
+    <div id="reveal-particles"></div>
+    <div id="top-bar">
       <div class="raga-counter" id="raga-counter">0 / 10</div>
       <div id="rec-badge"><div class="rec-dot"></div>REC</div>
       <div class="difficulty-badge" id="diff-badge">Easy</div>
     </div>
-
-    <!-- MIDDLE SECTION (~55%) - Video Box -->
-    <div class="cam-section-middle">
-      <div class="video-wrapper">
-        <video id="video-bg" autoplay muted playsinline></video>
+    <div id="countdown-wrap">
+      <div class="ring-container">
+        <svg id="ring-svg" viewBox="0 0 100 100">
+          <circle id="ring-bg" cx="50" cy="50" r="44"/>
+          <circle id="ring-progress" cx="50" cy="50" r="44"/>
+        </svg>
+        <div id="countdown-num">—</div>
       </div>
     </div>
-
-    <!-- BOTTOM SECTION (30%) - Interactive Elements -->
-    <div class="cam-section-bottom">
-      <div id="slot-wrap">
-        <div id="slot-window">
-          <div class="sel-line top"></div>
-          <div class="sel-line bot"></div>
-          <div id="slot-inner"></div>
-        </div>
-        <div class="slot-hint">Picking your Raga…</div>
-      </div>
-      <div id="raga-display">
-        <div id="raga-label">Now Sing</div>
-        <div id="raga-name">—</div>
-      </div>
-      <div id="reveal-particles"></div>
-      <div id="countdown-wrap">
-        <div class="ring-container">
-          <svg id="ring-svg" viewBox="0 0 100 100">
-            <circle id="ring-bg" cx="50" cy="50" r="44"/>
-            <circle id="ring-progress" cx="50" cy="50" r="44"/>
-          </svg>
-          <div id="countdown-num">—</div>
-        </div>
-      </div>
-      <div id="bottom-controls">
-        <button class="ctrl-btn primary" id="end-btn">
-          <div id="end-btn-fill"></div>
-          Hold to End
-        </button>
-      </div>
+    <div id="bottom-controls">
+      <button class="ctrl-btn primary" id="end-btn">
+        <div id="end-btn-fill"></div>
+        Hold to End
+      </button>
     </div>
-
     <div id="flash"></div>
   </div>
 
@@ -617,60 +579,57 @@ function startRecording(){
   const video=document.getElementById('video-bg');
   // Use actual app dimensions so canvas exactly matches what user sees
   const W=app.offsetWidth, H=app.offsetHeight;
-  const SCALE=2; // Render at 2x resolution for better video quality
   recCanvas=document.createElement('canvas');
-  recCanvas.width=W*SCALE; recCanvas.height=H*SCALE;
+  recCanvas.width=W; recCanvas.height=H;
   recCtx=recCanvas.getContext('2d');
   const cs=recCanvas.captureStream(30);
   mediaStream.getAudioTracks().forEach(t=>cs.addTrack(t));
   const mimes=['video/webm;codecs=vp9,opus','video/webm;codecs=vp8,opus','video/webm'];
   const mime=mimes.find(m=>MediaRecorder.isTypeSupported(m))||'video/webm';
-  mediaRecorder=new MediaRecorder(cs,{mimeType:mime,videoBitsPerSecond:8000000});
+  mediaRecorder=new MediaRecorder(cs,{mimeType:mime,videoBitsPerSecond:6000000});
   mediaRecorder.ondataavailable=e=>{ if(e.data.size>0) chunks.push(e.data); };
   isRecording=true; drawRunning=true;
   mediaRecorder.start(100); startTime=Date.now();
-  drawLoop(video,W,H,SCALE);
+  drawLoop(video,W,H);
 }
 
-function drawLoop(video,W,H,SCALE){
-  SCALE=SCALE||1;
+function drawLoop(video,W,H){
   if(!drawRunning) return;
   const ctx=recCtx;
-  const cW=W*SCALE, cH=H*SCALE; // Canvas dimensions (2x if SCALE=2)
 
   // ── Video: fill canvas preserving aspect ratio (cover) ──
   // The browser renders the video with object-fit:cover + scaleX(-1)
-  // We replicate this exactly on canvas (scaled to high resolution)
+  // We replicate this exactly on canvas
   const vw=video.videoWidth||W, vh=video.videoHeight||H;
-  const scale=Math.max(cW/vw, cH/vh);
+  const scale=Math.max(W/vw, H/vh);
   const sw=vw*scale, sh=vh*scale;
-  const ox=(cW-sw)/2, oy=(cH-sh)/2;
+  const ox=(W-sw)/2, oy=(H-sh)/2;
   ctx.save();
-  ctx.translate(cW,0); ctx.scale(-1,1);
+  ctx.translate(W,0); ctx.scale(-1,1);
   ctx.drawImage(video,ox,oy,sw,sh);
   ctx.restore();
 
   // ── Gradient overlays ──
-  let g=ctx.createLinearGradient(0,0,0,cH*0.26);
+  let g=ctx.createLinearGradient(0,0,0,H*0.26);
   g.addColorStop(0,'rgba(0,0,0,0.8)'); g.addColorStop(1,'rgba(0,0,0,0)');
-  ctx.fillStyle=g; ctx.fillRect(0,0,cW,cH*0.26);
-  g=ctx.createLinearGradient(0,cH*0.64,0,cH);
+  ctx.fillStyle=g; ctx.fillRect(0,0,W,H*0.26);
+  g=ctx.createLinearGradient(0,H*0.64,0,H);
   g.addColorStop(0,'rgba(0,0,0,0)'); g.addColorStop(1,'rgba(0,0,0,0.88)');
-  ctx.fillStyle=g; ctx.fillRect(0,cH*0.64,cW,cH*0.36);
+  ctx.fillStyle=g; ctx.fillRect(0,H*0.64,W,H*0.36);
 
   // ── 3-2-1-GO countdown (baked into recording) ──
   if(countdownActive && countdownText){
     ctx.fillStyle='rgba(0,0,0,0.5)';
-    ctx.fillRect(0,0,cW,cH);
+    ctx.fillRect(0,0,W,H);
     const isGo=countdownText==='GO!';
-    const cdFS=isGo?Math.round(cW*0.22):Math.round(cW*0.36);
+    const cdFS=isGo?Math.round(W*0.22):Math.round(W*0.36);
     ctx.font='700 '+cdFS+'px "Google Sans",sans-serif';
     ctx.fillStyle=isGo?'#F5C842':'white';
     ctx.textAlign='center'; ctx.textBaseline='middle';
-    ctx.shadowColor='rgba(245,200,66,0.6)'; ctx.shadowBlur=60*SCALE;
-    ctx.fillText(countdownText,cW/2,cH/2);
+    ctx.shadowColor='rgba(245,200,66,0.6)'; ctx.shadowBlur=60;
+    ctx.fillText(countdownText,W/2,H/2);
     ctx.shadowBlur=0; ctx.textBaseline='alphabetic';
-    requestAnimationFrame(()=>drawLoop(video,W,H,SCALE));
+    requestAnimationFrame(()=>drawLoop(video,W,H));
     return;
   }
 
@@ -678,16 +637,16 @@ function drawLoop(video,W,H,SCALE){
   if(endCardActive){
     const elapsed=(Date.now()-endCardStart)/1000;
     const presented=ragaList.slice(0,currentIdx);
-    const efs=s=>Math.round(cW*s);
+    const efs=s=>Math.round(W*s);
 
     // Dark background with subtle warm gradient
     ctx.fillStyle='#000';
-    ctx.fillRect(0,0,cW,cH);
-    const rg=ctx.createRadialGradient(cW/2,0,0,cW/2,0,cW*0.8);
+    ctx.fillRect(0,0,W,H);
+    const rg=ctx.createRadialGradient(W/2,0,0,W/2,0,W*0.8);
     rg.addColorStop(0,'rgba(26,16,0,0.8)');
     rg.addColorStop(1,'rgba(0,0,0,0)');
     ctx.fillStyle=rg;
-    ctx.fillRect(0,0,cW,cH);
+    ctx.fillRect(0,0,W,H);
 
     // "CHALLENGE COMPLETE" header
     const headAlpha=Math.min(1,elapsed/0.3);
@@ -695,20 +654,20 @@ function drawLoop(video,W,H,SCALE){
     ctx.font='500 '+efs(0.03)+'px "Google Sans",sans-serif';
     ctx.fillStyle='#F5C842';
     ctx.textAlign='center';
-    ctx.fillText('\u2726  CHALLENGE COMPLETE  \u2726',cW/2,cH*0.09);
+    ctx.fillText('\u2726  CHALLENGE COMPLETE  \u2726',W/2,H*0.09);
     ctx.font='700 '+efs(0.085)+'px "Google Sans",sans-serif';
     ctx.fillStyle='white';
-    ctx.shadowColor='rgba(245,200,66,0.3)'; ctx.shadowBlur=30*SCALE;
-    ctx.fillText('Your Ragas',cW/2,cH*0.16);
+    ctx.shadowColor='rgba(245,200,66,0.3)'; ctx.shadowBlur=30;
+    ctx.fillText('Your Ragas',W/2,H*0.16);
     ctx.shadowBlur=0;
     ctx.globalAlpha=1;
 
     // Raga list with staggered reveal
-    const maxListH=cH*0.58;
-    const lineH=Math.min(cH*0.055, maxListH/Math.max(presented.length,1));
+    const maxListH=H*0.58;
+    const lineH=Math.min(H*0.055, maxListH/Math.max(presented.length,1));
     const nameFS=Math.min(efs(0.05), Math.round(lineH*0.75));
     const numFS=Math.min(efs(0.04), Math.round(lineH*0.65));
-    const listY=cH*0.23;
+    const listY=H*0.23;
     const stagger=Math.min(0.15, 2.0/Math.max(presented.length,1));
 
     presented.forEach((raga,i)=>{
@@ -721,12 +680,12 @@ function drawLoop(video,W,H,SCALE){
       ctx.font='700 '+numFS+'px "Google Sans",sans-serif';
       ctx.fillStyle='#F5C842';
       ctx.textAlign='right';
-      ctx.fillText((i+1)+'.',cW*0.16,y);
+      ctx.fillText((i+1)+'.',W*0.16,y);
       // Raga name
       ctx.font='500 '+nameFS+'px "Google Sans",sans-serif';
       ctx.fillStyle='white';
       ctx.textAlign='left';
-      ctx.fillText(raga,cW*0.20,y);
+      ctx.fillText(raga,W*0.20,y);
     });
     ctx.globalAlpha=1;
 
@@ -738,42 +697,42 @@ function drawLoop(video,W,H,SCALE){
       ctx.font='500 '+efs(0.032)+'px "Google Sans",sans-serif';
       ctx.fillStyle='rgba(255,255,255,0.5)';
       ctx.textAlign='center';
-      ctx.fillText(currentIdx+' Ragas  \u2022  '+challengeElapsed+'s  \u2022  '+difficulty[0].toUpperCase()+difficulty.slice(1),cW/2,cH*0.90);
+      ctx.fillText(currentIdx+' Ragas  \u2022  '+challengeElapsed+'s  \u2022  '+difficulty[0].toUpperCase()+difficulty.slice(1),W/2,H*0.90);
       ctx.globalAlpha=1;
     }
 
-    requestAnimationFrame(()=>drawLoop(video,W,H,SCALE));
+    requestAnimationFrame(()=>drawLoop(video,W,H));
     return;
   }
 
-  const topY=cH*0.1;
-  const fs=s=>Math.round(cW*s);
+  const topY=H*0.1;
+  const fs=s=>Math.round(W*s);
 
   // ── Counter ──
   ctx.font='500 '+fs(0.034)+'px "Google Sans",sans-serif';
   ctx.fillStyle='rgba(255,255,255,0.75)'; ctx.textAlign='left';
-  ctx.fillText(document.getElementById('raga-counter').textContent, cW*0.07, topY);
+  ctx.fillText(document.getElementById('raga-counter').textContent, W*0.07, topY);
 
   // ── Difficulty ──
   ctx.font='500 '+fs(0.028)+'px "Google Sans",sans-serif';
   ctx.fillStyle='#F5C842'; ctx.textAlign='right';
-  ctx.fillText(difficulty.toUpperCase(), cW*0.93, topY);
+  ctx.fillText(difficulty.toUpperCase(), W*0.93, topY);
 
   // ── REC dot + label ──
   ctx.fillStyle='#E63946';
-  ctx.beginPath(); ctx.arc(cW/2-cW*0.06,topY-4*SCALE,cW*0.018,0,Math.PI*2); ctx.fill();
+  ctx.beginPath(); ctx.arc(W/2-W*0.06,topY-4,W*0.018,0,Math.PI*2); ctx.fill();
   ctx.font='500 '+fs(0.028)+'px "Google Sans",sans-serif';
   ctx.textAlign='center';
-  ctx.fillText('REC',cW/2+cW*0.028,topY);
+  ctx.fillText('REC',W/2+W*0.028,topY);
 
   // ── Slot machine (when active) ──
   const slotWrap=document.getElementById('slot-wrap');
   if(slotWrap.classList.contains('active')){
-    ctx.fillStyle='rgba(0,0,0,0.65)'; ctx.fillRect(0,0,cW,cH);
+    ctx.fillStyle='rgba(0,0,0,0.65)'; ctx.fillRect(0,0,W,H);
     const inner=document.getElementById('slot-inner');
     const mat=new DOMMatrix(window.getComputedStyle(inner).transform);
-    const ty=mat.m42*SCALE;
-    const wH=192*SCALE, wY=(cH-wH)/2, IH=64*SCALE;
+    const ty=mat.m42;
+    const wH=192, wY=(H-wH)/2, IH=64;
     const fsize=fs(0.082);
     ctx.font='700 '+fsize+'px "Google Sans",sans-serif';
     ctx.textAlign='center';
@@ -781,27 +740,27 @@ function drawLoop(video,W,H,SCALE){
       const iy=wY+i*IH+ty, cy2=iy+IH/2;
       if(cy2<wY-IH||cy2>wY+wH+IH) return;
       ctx.fillStyle=el.classList.contains('center')?'white':'rgba(255,255,255,0.2)';
-      if(el.classList.contains('center')){ ctx.shadowColor='rgba(245,200,66,0.7)'; ctx.shadowBlur=20*SCALE; }
-      ctx.fillText(el.textContent,cW/2,cy2+fsize*0.36);
+      if(el.classList.contains('center')){ ctx.shadowColor='rgba(245,200,66,0.7)'; ctx.shadowBlur=20; }
+      ctx.fillText(el.textContent,W/2,cy2+fsize*0.36);
       ctx.shadowBlur=0;
     });
     // Gold lines
     const l1=wY+wH*0.32, l2=wY+wH*0.68;
-    ctx.strokeStyle='#F5C842'; ctx.lineWidth=2*SCALE;
-    ctx.shadowColor='#F5C842'; ctx.shadowBlur=14*SCALE;
-    ctx.beginPath(); ctx.moveTo(cW*0.05,l1); ctx.lineTo(cW*0.95,l1); ctx.stroke();
-    ctx.beginPath(); ctx.moveTo(cW*0.05,l2); ctx.lineTo(cW*0.95,l2); ctx.stroke();
+    ctx.strokeStyle='#F5C842'; ctx.lineWidth=2;
+    ctx.shadowColor='#F5C842'; ctx.shadowBlur=14;
+    ctx.beginPath(); ctx.moveTo(W*0.05,l1); ctx.lineTo(W*0.95,l1); ctx.stroke();
+    ctx.beginPath(); ctx.moveTo(W*0.05,l2); ctx.lineTo(W*0.95,l2); ctx.stroke();
     ctx.shadowBlur=0;
     // Fades
     let gf=ctx.createLinearGradient(0,wY,0,wY+wH*0.38);
     gf.addColorStop(0,'rgba(0,0,0,0.95)'); gf.addColorStop(1,'rgba(0,0,0,0)');
-    ctx.fillStyle=gf; ctx.fillRect(0,wY,cW,wH*0.38);
+    ctx.fillStyle=gf; ctx.fillRect(0,wY,W,wH*0.38);
     gf=ctx.createLinearGradient(0,wY+wH*0.62,0,wY+wH);
     gf.addColorStop(0,'rgba(0,0,0,0)'); gf.addColorStop(1,'rgba(0,0,0,0.95)');
-    ctx.fillStyle=gf; ctx.fillRect(0,wY+wH*0.62,cW,wH*0.38);
+    ctx.fillStyle=gf; ctx.fillRect(0,wY+wH*0.62,W,wH*0.38);
     ctx.font='400 '+fs(0.027)+'px "Google Sans",sans-serif';
     ctx.fillStyle='rgba(255,255,255,0.4)'; ctx.textAlign='center';
-    ctx.fillText('PICKING YOUR RAGA…',cW/2,wY+wH+28*SCALE);
+    ctx.fillText('PICKING YOUR RAGA…',W/2,wY+wH+28);
   } else {
     // ── Raga name ──
     const rd=document.getElementById('raga-display');
@@ -810,25 +769,25 @@ function drawLoop(video,W,H,SCALE){
       if(name&&name!=='—'){
         ctx.font='500 '+fs(0.028)+'px "Google Sans",sans-serif';
         ctx.fillStyle='#F5C842'; ctx.textAlign='center';
-        ctx.fillText('NOW SING',cW/2,cH*0.40-cH*0.058);
+        ctx.fillText('NOW SING',W/2,H*0.40-H*0.058);
         ctx.font='700 '+fs(0.16)+'px "Google Sans",sans-serif';
         ctx.fillStyle='white'; ctx.textAlign='center';
-        ctx.shadowColor='rgba(245,200,66,0.45)'; ctx.shadowBlur=50*SCALE;
-        ctx.fillText(name,cW/2,cH*0.43);
+        ctx.shadowColor='rgba(245,200,66,0.45)'; ctx.shadowBlur=50;
+        ctx.fillText(name,W/2,H*0.43);
         ctx.shadowBlur=0;
       }
     }
   }
 
   // ── Countdown ring on canvas ──
-  const rCX=cW/2, rCY=cH*0.90, rR=cW*0.145;
+  const rCX=W/2, rCY=H*0.90, rR=W*0.145;
   const frac=Math.max(0,secondsLeft/timePerRaga);
   ctx.beginPath(); ctx.arc(rCX,rCY,rR,0,Math.PI*2);
-  ctx.strokeStyle='rgba(255,255,255,0.12)'; ctx.lineWidth=4*SCALE; ctx.stroke();
+  ctx.strokeStyle='rgba(255,255,255,0.12)'; ctx.lineWidth=4; ctx.stroke();
   if(secondsLeft>0&&frac>0){
     const r2=Math.round(245+(230-245)*(1-frac)), g2=Math.round(200+(57-200)*(1-frac)), b2=Math.round(66+(70-66)*(1-frac));
     ctx.beginPath(); ctx.arc(rCX,rCY,rR,-Math.PI/2,-Math.PI/2+Math.PI*2*frac);
-    ctx.strokeStyle='rgb('+r2+','+g2+','+b2+')'; ctx.lineWidth=4*SCALE; ctx.lineCap='round'; ctx.stroke();
+    ctx.strokeStyle='rgb('+r2+','+g2+','+b2+')'; ctx.lineWidth=4; ctx.lineCap='round'; ctx.stroke();
     ctx.lineCap='butt';
   }
   if(secondsLeft>0){
@@ -837,7 +796,7 @@ function drawLoop(video,W,H,SCALE){
     ctx.fillText(String(secondsLeft),rCX,rCY+rR*0.35);
   }
 
-  requestAnimationFrame(()=>drawLoop(video,W,H,SCALE));
+  requestAnimationFrame(()=>drawLoop(video,W,H));
 }
 
 function stopRecording(onStopped){

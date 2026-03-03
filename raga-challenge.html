@@ -153,7 +153,7 @@ html, body {
   display:none; flex-direction:column; align-items:center; justify-content:center;
 }
 #slot-wrap.active { display:flex; }
-#slot-window { width:88%; height:192px; overflow:hidden; position:relative; display:flex; align-items:center; justify-content:center; }
+#slot-window { width:88%; height:192px; overflow:hidden; position:relative; display:flex; align-items:flex-start; justify-content:center; }
 #slot-window::before,#slot-window::after { content:''; position:absolute; left:0; right:0; height:36%; z-index:2; pointer-events:none; }
 #slot-window::before { top:0; background:linear-gradient(to bottom,rgba(0,0,0,0.95),transparent); }
 #slot-window::after  { bottom:0; background:linear-gradient(to top,rgba(0,0,0,0.95),transparent); }
@@ -548,7 +548,10 @@ function runSlotMachine(target, onDone){
   items.forEach(n=>{ const d=document.createElement('div'); d.className='slot-item'; d.textContent=n; inner.appendChild(d); });
   wrap.classList.add('active');
   const totalDist=(items.length-1)*ITEM_H;  // 1280px
-  const finalY=-totalDist;
+  // startY offsets inner so item[0] is centered in the 192px window (96 - 32 = 64px)
+  const startY=192/2-ITEM_H/2;              // 64px
+  const finalY=startY-totalDist;            // 64 - 1280 = -1216px (item[last] centered)
+  inner.style.transform='translateY('+startY+'px)';
   // Time-based animation: guaranteed completion, cubic ease-out to zero velocity
   // Fast phase: first 768px at 20px/frame (640ms)
   // Decel phase: last 512px cubic ease-out (1280ms)
@@ -569,7 +572,7 @@ function runSlotMachine(target, onDone){
       const p=(el-SPIN_MS)/DECEL_MS;
       pos=spinDist+(1-Math.pow(1-p,3))*decelDist; // cubic ease-out
     }
-    inner.style.transform='translateY('+-pos+'px)';
+    inner.style.transform='translateY('+(startY-pos)+'px)';
     const ci=Math.min(items.length-1, Math.round(pos/ITEM_H));
     inner.querySelectorAll('.slot-item').forEach((e,i)=>e.classList.toggle('center',i===ci));
     if(el>=TOTAL_MS){
@@ -793,7 +796,7 @@ function drawLoop(video,W,H,dpr=1){
     ctx.font='700 '+fsize+'px "Google Sans",sans-serif';
     ctx.textAlign='center';
     inner.querySelectorAll('.slot-item').forEach((el,i)=>{
-      const iy=wY+i*IH+ty, cy2=iy+IH/2;
+      const iy=wY+i*IH+ty*dpr, cy2=iy+IH/2;
       if(cy2<wY-IH||cy2>wY+wH+IH) return;
       ctx.fillStyle=el.classList.contains('center')?'white':'rgba(255,255,255,0.2)';
       if(el.classList.contains('center')){ ctx.shadowColor='rgba(245,200,66,0.7)'; ctx.shadowBlur=20; }

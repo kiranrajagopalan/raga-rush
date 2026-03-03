@@ -543,25 +543,37 @@ function runSlotMachine(target, onDone){
   const ITEM_H=64;
   inner.innerHTML=items.map(n=>'<div class="slot-item">'+n+'</div>').join('');
   wrap.classList.add('active');
-  const finalY=-(items.length-1)*ITEM_H;
-  let currentY=0, speed=ITEM_H*0.38;
-  const SLOW_ZONE=ITEM_H*10;
-  function tick(){
-    const dist=Math.abs(finalY-currentY);
-    // Snap cleanly when close enough — no crawl, no abrupt stop
-    if(dist<0.5){
+  const totalDist=(items.length-1)*ITEM_H;  // 1280px
+  const finalY=-totalDist;
+  // Time-based animation: guaranteed completion, cubic ease-out to zero velocity
+  // Fast phase: first 768px at 20px/frame (640ms)
+  // Decel phase: last 512px cubic ease-out (1280ms)
+  const decelDist=Math.min(totalDist,8*ITEM_H); // 512px
+  const spinDist=totalDist-decelDist;            // 768px
+  const MPF=1000/60;                             // ms per frame at 60fps
+  const SPIN_MS=spinDist/20*MPF;                 // 640ms
+  const DECEL_MS=3*decelDist/20*MPF;            // 1280ms — cubic initial speed matches fast phase
+  const TOTAL_MS=SPIN_MS+DECEL_MS;              // 1920ms
+  let t0=null;
+  function tick(ts){
+    if(!t0) t0=ts;
+    const el=Math.min(ts-t0, TOTAL_MS);
+    let pos;
+    if(el<SPIN_MS){
+      pos=(el/SPIN_MS)*spinDist;
+    } else {
+      const p=(el-SPIN_MS)/DECEL_MS;
+      pos=spinDist+(1-Math.pow(1-p,3))*decelDist; // cubic ease-out
+    }
+    inner.style.transform='translateY('+-pos+'px)';
+    const ci=Math.min(items.length-1, Math.round(pos/ITEM_H));
+    inner.querySelectorAll('.slot-item').forEach((e,i)=>e.classList.toggle('center',i===ci));
+    if(el>=TOTAL_MS){
       inner.style.transform='translateY('+finalY+'px)';
-      const lastIdx=items.length-1;
-      inner.querySelectorAll('.slot-item').forEach((el,i)=>el.classList.toggle('center',i===lastIdx));
+      inner.querySelectorAll('.slot-item').forEach((e,i)=>e.classList.toggle('center',i===items.length-1));
       setTimeout(()=>{ wrap.classList.remove('active'); onDone(); },700);
       return;
     }
-    // Quadratic ease-out: speed approaches zero naturally as dist → 0
-    if(dist<SLOW_ZONE) speed=Math.pow(dist/SLOW_ZONE,2)*ITEM_H*0.38;
-    currentY=Math.max(currentY-speed,finalY);
-    inner.style.transform='translateY('+currentY+'px)';
-    const ci=Math.round(Math.abs(currentY)/ITEM_H);
-    inner.querySelectorAll('.slot-item').forEach((el,i)=>el.classList.toggle('center',i===ci));
     requestAnimationFrame(tick);
   }
   requestAnimationFrame(tick);

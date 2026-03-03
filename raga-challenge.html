@@ -392,6 +392,7 @@ let recCanvas=null, recCtx=null, drawRunning=false;
 let finalBlob=null;
 let countdownActive=false, countdownText='';
 let challengeElapsed=0, mp4Blob=null, uploadFailed=false;
+let endCardActive=false, endCardStart=0;
 
 const CIRC = 2*Math.PI*44;
 document.getElementById('ring-progress').style.strokeDasharray = CIRC;
@@ -632,6 +633,78 @@ function drawLoop(video,W,H){
     return;
   }
 
+  // ── End Card (baked into recording) ──
+  if(endCardActive){
+    const elapsed=(Date.now()-endCardStart)/1000;
+    const presented=ragaList.slice(0,currentIdx);
+    const efs=s=>Math.round(W*s);
+
+    // Dark background with subtle warm gradient
+    ctx.fillStyle='#000';
+    ctx.fillRect(0,0,W,H);
+    const rg=ctx.createRadialGradient(W/2,0,0,W/2,0,W*0.8);
+    rg.addColorStop(0,'rgba(26,16,0,0.8)');
+    rg.addColorStop(1,'rgba(0,0,0,0)');
+    ctx.fillStyle=rg;
+    ctx.fillRect(0,0,W,H);
+
+    // "CHALLENGE COMPLETE" header
+    const headAlpha=Math.min(1,elapsed/0.3);
+    ctx.globalAlpha=headAlpha;
+    ctx.font='500 '+efs(0.03)+'px "Google Sans",sans-serif';
+    ctx.fillStyle='#F5C842';
+    ctx.textAlign='center';
+    ctx.fillText('\u2726  CHALLENGE COMPLETE  \u2726',W/2,H*0.09);
+    ctx.font='700 '+efs(0.085)+'px "Google Sans",sans-serif';
+    ctx.fillStyle='white';
+    ctx.shadowColor='rgba(245,200,66,0.3)'; ctx.shadowBlur=30;
+    ctx.fillText('Your Ragas',W/2,H*0.16);
+    ctx.shadowBlur=0;
+    ctx.globalAlpha=1;
+
+    // Raga list with staggered reveal
+    const maxListH=H*0.58;
+    const lineH=Math.min(H*0.055, maxListH/Math.max(presented.length,1));
+    const nameFS=Math.min(efs(0.05), Math.round(lineH*0.75));
+    const numFS=Math.min(efs(0.04), Math.round(lineH*0.65));
+    const listY=H*0.23;
+    const stagger=Math.min(0.15, 2.0/Math.max(presented.length,1));
+
+    presented.forEach((raga,i)=>{
+      const delay=0.3+i*stagger;
+      const alpha=Math.min(1,Math.max(0,(elapsed-delay)/0.25));
+      if(alpha<=0) return;
+      ctx.globalAlpha=alpha;
+      const y=listY+i*lineH;
+      // Number
+      ctx.font='700 '+numFS+'px "Google Sans",sans-serif';
+      ctx.fillStyle='#F5C842';
+      ctx.textAlign='right';
+      ctx.fillText((i+1)+'.',W*0.16,y);
+      // Raga name
+      ctx.font='500 '+nameFS+'px "Google Sans",sans-serif';
+      ctx.fillStyle='white';
+      ctx.textAlign='left';
+      ctx.fillText(raga,W*0.20,y);
+    });
+    ctx.globalAlpha=1;
+
+    // Stats row at bottom
+    const statsDelay=0.3+presented.length*stagger+0.3;
+    const statsAlpha=Math.min(1,Math.max(0,(elapsed-statsDelay)/0.3));
+    if(statsAlpha>0){
+      ctx.globalAlpha=statsAlpha;
+      ctx.font='500 '+efs(0.032)+'px "Google Sans",sans-serif';
+      ctx.fillStyle='rgba(255,255,255,0.5)';
+      ctx.textAlign='center';
+      ctx.fillText(currentIdx+' Ragas  \u2022  '+challengeElapsed+'s  \u2022  '+difficulty[0].toUpperCase()+difficulty.slice(1),W/2,H*0.90);
+      ctx.globalAlpha=1;
+    }
+
+    requestAnimationFrame(()=>drawLoop(video,W,H));
+    return;
+  }
+
   const topY=H*0.1;
   const fs=s=>Math.round(W*s);
 
@@ -737,12 +810,21 @@ function stopRecording(onStopped){
 function stopChallenge(){ clearInterval(cdInterval); endChallenge(); }
 
 function endChallenge(){
+  if(endCardActive) return;
   clearInterval(cdInterval);
   challengeElapsed=startTime?Math.round((Date.now()-startTime)/1000):ragaCount*timePerRaga;
-  stopRecording(()=>{
-    showResultsScreen();
-    processVideoInBackground();
-  });
+  endCardActive=true;
+  endCardStart=Date.now();
+  document.getElementById('rec-badge').classList.remove('visible');
+  showResultsScreen(); // user sees interactive results immediately
+  // Keep recording to capture end card on canvas
+  const n=ragaList.slice(0,currentIdx).length;
+  const stagger=Math.min(0.15, 2.0/Math.max(n,1));
+  const endMs=Math.max(3500, Math.round((0.5+n*stagger+1.5)*1000));
+  setTimeout(()=>{
+    endCardActive=false;
+    stopRecording(()=>{ processVideoInBackground(); });
+  }, endMs);
 }
 
 function showResultsScreen(){
@@ -954,6 +1036,7 @@ function restart(){
   isRecording=false; drawRunning=false; currentIdx=0;
   countdownActive=false; countdownText='';
   challengeElapsed=0; uploadFailed=false;
+  endCardActive=false; endCardStart=0;
   document.getElementById('dl-btn').textContent='⏳ Preparing…';
   document.getElementById('dl-btn').disabled=true;
   showScreen('setup-screen');

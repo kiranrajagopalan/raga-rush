@@ -235,6 +235,9 @@ html, body {
 .results-list li .raga-text { font-size:16px; font-weight:500; color:rgba(255,255,255,0.85); }
 @keyframes resultFadeIn { to { opacity:1; transform:translateY(0); } }
 .results-stats { display:flex; gap:3%; width:100%; margin-bottom:5%; }
+#surprise-reveal { width:100%; background:rgba(245,200,66,0.08); border:1px solid rgba(245,200,66,0.3); border-radius:14px; padding:5% 6%; margin-bottom:5%; text-align:center; }
+.surprise-theme-name { font-size:15px; font-weight:700; color:var(--gold); letter-spacing:0.5px; margin-bottom:6px; }
+.surprise-reveal-text { font-size:13px; color:rgba(255,255,255,0.7); line-height:1.5; font-style:italic; }
 #get-video-btn { width:100%; padding:5%; background:var(--gold); color:#000; border:none; border-radius:14px; font-family:var(--font); font-size:18px; font-weight:700; cursor:pointer; box-shadow:0 8px 32px rgba(245,200,66,0.45); transition:transform 0.15s; margin-top:auto; margin-bottom:4%; }
 #get-video-btn:hover { transform:translateY(-2px); }
 </style>
@@ -248,11 +251,11 @@ html, body {
     <div class="app-eyebrow">Carnatic</div>
     <div class="app-title">Raga<br>Challenge</div>
     <div class="app-subtitle">Improvise · Record · Share</div>
-    <div class="section-label">Difficulty</div>
+    <div class="section-label">Mode</div>
     <div class="option-group" id="diff-group">
-      <button class="opt-btn selected" data-key="difficulty" data-val="easy" onclick="selectOpt(this,'diff-group')">Easy<span class="diff-desc">Popular ragas</span></button>
-      <button class="opt-btn" data-key="difficulty" data-val="medium" onclick="selectOpt(this,'diff-group')">Medium<span class="diff-desc">Similar pairs</span></button>
-      <button class="opt-btn" data-key="difficulty" data-val="hard" onclick="selectOpt(this,'diff-group')">Hard<span class="diff-desc">Rare &amp; tricky</span></button>
+      <button class="opt-btn selected" data-key="difficulty" data-val="easy" onclick="selectOpt(this,'diff-group')">Easy<span class="diff-desc">7 familiar · 3 stretch</span></button>
+      <button class="opt-btn" data-key="difficulty" data-val="notSoEasy" onclick="selectOpt(this,'diff-group')">Not So Easy<span class="diff-desc">5 medium · 3 hard · 2 easy</span></button>
+      <button class="opt-btn" data-key="difficulty" data-val="surpriseMe" onclick="selectOpt(this,'diff-group')">Surprise Me<span class="diff-desc">5 ragas · themed session</span></button>
     </div>
     <div class="section-label">Seconds per Raga</div>
     <div class="option-group" id="time-group">
@@ -260,8 +263,8 @@ html, body {
       <button class="opt-btn selected" data-key="timePerRaga" data-val="8" onclick="selectOpt(this,'time-group')">8s</button>
       <button class="opt-btn" data-key="timePerRaga" data-val="10" onclick="selectOpt(this,'time-group')">10s</button>
     </div>
-    <div class="section-label">Number of Ragas</div>
-    <div class="option-group" id="count-group">
+    <div class="section-label count-section">Number of Ragas</div>
+    <div class="option-group count-section" id="count-group">
       <button class="opt-btn" data-key="ragaCount" data-val="5" onclick="selectOpt(this,'count-group')">5</button>
       <button class="opt-btn selected" data-key="ragaCount" data-val="10" onclick="selectOpt(this,'count-group')">10</button>
       <button class="opt-btn" data-key="ragaCount" data-val="20" onclick="selectOpt(this,'count-group')">20</button>
@@ -358,7 +361,11 @@ html, body {
     <div class="results-stats">
       <div class="stat-box"><div class="stat-num" id="res-stat-ragas">0</div><div class="stat-label">Ragas</div></div>
       <div class="stat-box"><div class="stat-num" id="res-stat-time">0s</div><div class="stat-label">Duration</div></div>
-      <div class="stat-box"><div class="stat-num" id="res-stat-diff">—</div><div class="stat-label">Level</div></div>
+      <div class="stat-box"><div class="stat-num" id="res-stat-diff">—</div><div class="stat-label">Mode</div></div>
+    </div>
+    <div id="surprise-reveal" style="display:none">
+      <div class="surprise-theme-name" id="surprise-theme-name"></div>
+      <div class="surprise-reveal-text" id="surprise-reveal-text"></div>
     </div>
     <button id="get-video-btn" onclick="goToDoneScreen()">Get Your Video &rarr;</button>
   </div>
@@ -398,12 +405,32 @@ html, body {
 </div>
 <script>
 const RAGAS = {
-  easy:['Shankarabharanam','Kalyani','Bhairavi','Todi','Kambhoji','Mohanam','Bilahari','Hindolam','Hamsadhwani','Revati','Natabhairavi','Charukesi','Kharaharapriya','Harikambhoji','Mayamalavagowla','Begada','Sahana','Suddha Dhanyasi','Punnagavarali','Anandabhairavi'],
-  medium:['Saveri','Pantuvarali','Suddha Saveri','Shanmukhapriya','Vachaspati','Kamavardhini','Latangi','Nattai','Varali','Navarasapriya','Hemavathi','Dharmavathi','Gaurimanohari','Simhendramadhyama','Sriranjani','Devagandhari','Kedaragowla','Kalavathi','Amritavarshini','Suddha Todi'],
-  hard:['Naganandini','Chitrambari','Ramapriya','Dhavalambari','Nasikabhushani','Kosalam','Rishabhapriya','Jhalavarali','Visvambhari','Sucharitra','Raghupriya','Gavambhodhi','Pavani','Shadvidhamargini','Salagam','Vagadhisvari','Supradeepam','Jyotisvarupini','Hatakambari','Kantamani']
+  easy:['Hanumathodi','Māyāmālavagowla','Kīravāni','Kharaharapriya','Gowrimanohari','Charukeshi','Shankarābharanam','Kāmavardhini','Shanmukhapriya','Vāchaspathi','Mechakalyāni','Sindhu Bhairavi','Sāvēri','Malayamārutham','Valachi','Vasanthā','Ānandabhairavi','Bhairavi','Hindholam','Sāramathi','Suddha Dhanyāsi','Ābhēri','Abhōgi','Bāgēshri','Brindāvanasāranga','Hindusthāni Kāpi','Kānada','Madhyamāvathi','Rīthigowla','Shrīrāga','Nalinakānthi','Bahudhari','Dvijāvanthi','Kāmbhoji','Kamās','Mohana','Sahāna','Surati','Thilang','Arabhi','Atāna','Begada','Bēhāg','Bilāhari','Hamsadhvani','Kadhana Kuthūhalam','Kēdhāram','Nīlāmbari','Nāta','Pūrvikalyāni','Hamsanādham','Sarasvathi','Hamirkalyāni','Mohanakalyāni','Yamunākalyāni','Amruthavarshini'],
+  medium:['Gānamūrthi','Chakravākam','Natabhairavi','Harikāmbhoji','Chalanāta','Shubhapanthuvarāli','Simhendra Madhyamam','Hemāvathi','Dharmāvathi','Lathāngi','Jyothisvarūpini','Nāsikabhūshani','Rasikapriya','Āhiri','Bhūpālam','Dhanyāsi','Punnāgavarāli','Bowli','Gowla','Jaganmōhini','Lalithā','Malahāri','Nādhanāmakriya','Rēvagupthi','Bindhumālini','Mārgahindholam','Kalyāna Vasantham','Āndholika','Chiththaranjani','Dharbāru','Husēni','Manirangu','Mukhāri','Sālakabhairavi','Shrīranjani','Suddha Bangāla','Kamalāmanōhari','Kāpinārayani','Karnātaka Bēhāg','Kedhāragowla','Kunthalavarāli','Nāgasvarāvali','Nātakurānji','Navarasa Kannada','Ravichandhrika','Sāma','Yadhukulakāmbhoji','Dhēvagāndhāri','Hindusthāni Bēhāg','Kurānji','Mānd','Pūrnachandhrika','Suddha Sāvēri','Gambhiranāta','Varāli','Hamsānandhi','Madhuvanthi','Ranjani','Sāranga'],
+  hard:['Kanakangi','Rathnāngi','Vanaspathi','Sēnāvathi','Dhēnukā','Nātakapriya','Kōkilapriya','Vakulābharanam','Sūryakāntam','Jankāradhvani','Varunapriya','Sarasāngi','Vāgadhīsvari','Pāvani','Bhavapriya','Gamanashrama','Rishabhapriya','Kosalam','Gowlipanthu','Gujjari','Pharaz','Sindhu Rāmakriya','Kalāvathi','Sowrāshtram','Pūrnalalitha','Jayanthashrī','Pūrnashajja','Jayanthasēna','Nāyaki','Nārāyani','Bangāla','Janaranjani','Kannada','Navaroj','Chandhrajyothi']
 };
 
+const SURPRISE_THEMES = [
+  { name:'The "Priya" Family',         reveal:"Every raga you just sang has 'priya' (beloved) in its name.",                                              pool:['Kharaharapriya','Shanmukhapriya','Rasikapriya','Nātakapriya','Varunapriya','Bhavapriya','Rishabhapriya'] },
+  { name:'The "Kalyāni" Family',        reveal:'Six faces of Kalyāni — all named after the same beloved scale.',                                           pool:['Mechakalyāni','Hamirkalyāni','Mohanakalyāni','Yamunākalyāni','Pūrvikalyāni','Kalyāna Vasantham'] },
+  { name:'Children of Shankarābharanam',reveal:'Same 7 svaras as Shankarābharanam (Mela 29) — completely different personalities.',                        pool:['Arabhi','Bilāhari','Hamsadhvani','Bēhāg','Nīlāmbari','Kēdhāram','Suddha Sāvēri','Dhēvagāndhāri','Mānd','Hindusthāni Bēhāg','Kurānji','Pūrnachandhrika','Janaranjani','Kannada','Navaroj','Bangāla'] },
+  { name:'Children of Kharaharapriya',  reveal:'Siblings that sound nothing alike — all share the parent scale Kharaharapriya (Mela 22).',                 pool:['Ābhēri','Abhōgi','Brindāvanasāranga','Bāgēshri','Madhyamāvathi','Shrīrāga','Hindusthāni Kāpi','Mukhāri','Dharbāru','Shrīranjani','Husēni'] },
+  { name:'The Pentatonic Club',         reveal:'Every raga in this session uses exactly 5 notes.',                                                          pool:['Hindholam','Abhōgi','Mohana','Hamsadhvani','Madhyamāvathi','Ābhēri','Amruthavarshini'] },
+  { name:'The Sharp Fourth',            reveal:'Every raga you sang uses the sharp fourth (tivra Ma) — that distinctive lift in the scale.',                pool:['Mechakalyāni','Kāmavardhini','Vāchaspathi','Pūrvikalyāni','Hamirkalyāni','Mohanakalyāni','Yamunākalyāni','Amruthavarshini','Shanmukhapriya','Simhendra Madhyamam','Hemāvathi','Dharmāvathi','Hamsānandhi','Madhuvanthi','Ranjani','Sāranga','Varāli'] },
+  { name:'The Bhairavi Clan',           reveal:'All roads lead to Bhairavi — four ragas, one ancient name.',                                               pool:['Bhairavi','Ānandabhairavi','Sindhu Bhairavi','Natabhairavi'] },
+  { name:'The Hindustani Visitors',     reveal:'Every raga in this session crossed the Vindhyas — all have Hindustani roots.',                             pool:['Bēhāg','Hindusthāni Kāpi','Bāgēshri','Mānd','Hindusthāni Bēhāg','Husēni','Dharbāru'] },
+  { name:'The Atlas',                   reveal:'A musical map — every raga in this session is named after a place.',                                        pool:['Kēdhāram','Sindhu Bhairavi','Kannada','Bangāla','Gujjari','Kosalam','Pharaz','Sindhu Rāmakriya'] },
+  { name:'The Zoo',                     reveal:'Swan, cuckoo, lion, serpent — every raga in this session is named after a creature.',                       pool:['Hamsadhvani','Hamsānandhi','Simhendra Madhyamam','Nāgasvarāvali','Kōkilapriya'] },
+  { name:'Cosmic Light Show',           reveal:'Sun, moon, and light — every raga carries a celestial name.',                                              pool:['Pūrnachandhrika','Jyothisvarūpini','Sūryakāntam','Chandhrajyothi'] },
+  { name:'The Varāli Family',           reveal:'Four variations on one haunting scale — the Varāli family.',                                               pool:['Varāli','Punnāgavarāli','Shubhapanthuvarāli','Kunthalavarāli'] }
+];
+
+function shuffle(arr){ for(let i=arr.length-1;i>0;i--){ const j=Math.floor(Math.random()*(i+1));[arr[i],arr[j]]=[arr[j],arr[i]]; } return arr; }
+function drawN(arr,n){ return shuffle([...arr]).slice(0,n); }
+function modeLabel(){ return {easy:'Easy',notSoEasy:'Not So Easy',surpriseMe:'Surprise Me'}[difficulty]||difficulty; }
+
 let difficulty='easy', timePerRaga=8, ragaCount=10;
+let lastSurpriseThemeIdx=-1, activeTheme=null;
 let currentIdx=0, ragaList=[], cdInterval=null, secondsLeft=0;
 let mediaStream=null, mediaRecorder=null, chunks=[];
 let isRecording=false, startTime=null;
@@ -423,7 +450,11 @@ function selectOpt(btn, groupId) {
   document.querySelectorAll('#'+groupId+' .opt-btn').forEach(b=>b.classList.remove('selected'));
   btn.classList.add('selected');
   const k=btn.dataset.key, v=btn.dataset.val;
-  if(k==='difficulty') difficulty=v;
+  if(k==='difficulty'){
+    difficulty=v;
+    const isSurprise = v==='surpriseMe';
+    document.querySelectorAll('.count-section').forEach(el=>el.style.display=isSurprise?'none':'');
+  }
   if(k==='timePerRaga') timePerRaga=parseInt(v);
   if(k==='ragaCount') ragaCount=parseInt(v);
 }
@@ -468,7 +499,7 @@ function beginCountdown(){
 
   // Switch to camera-screen FIRST so video feed is visible during countdown
   showScreen('camera-screen');
-  document.getElementById('diff-badge').textContent=difficulty[0].toUpperCase()+difficulty.slice(1);
+  document.getElementById('diff-badge').textContent=modeLabel();
   document.getElementById('raga-counter').textContent='0 / '+ragaCount;
 
   // Start recording immediately — countdown gets baked into the video
@@ -509,9 +540,29 @@ function beginCountdown(){
 }
 
 function setupChallenge(){
-  const pool=[...RAGAS[difficulty]];
-  for(let i=pool.length-1;i>0;i--){ const j=Math.floor(Math.random()*(i+1));[pool[i],pool[j]]=[pool[j],pool[i]]; }
-  ragaList=pool.slice(0,ragaCount); currentIdx=0;
+  let pool=[];
+  activeTheme=null;
+
+  if(difficulty==='easy'){
+    pool=[...drawN(RAGAS.easy,7),...drawN(RAGAS.medium,3)];
+  } else if(difficulty==='notSoEasy'){
+    pool=[...drawN(RAGAS.easy,2),...drawN(RAGAS.medium,5),...drawN(RAGAS.hard,3)];
+  } else if(difficulty==='surpriseMe'){
+    let idx;
+    do { idx=Math.floor(Math.random()*SURPRISE_THEMES.length); } while(idx===lastSurpriseThemeIdx && SURPRISE_THEMES.length>1);
+    lastSurpriseThemeIdx=idx;
+    activeTheme=SURPRISE_THEMES[idx];
+    const themePool=shuffle([...activeTheme.pool]);
+    pool=themePool.slice(0,5);
+    if(pool.length<5){
+      const filler=drawN(RAGAS.easy.filter(r=>!pool.includes(r)),5-pool.length);
+      pool=[...pool,...filler];
+    }
+  }
+
+  shuffle(pool);
+  ragaCount=difficulty==='surpriseMe'?5:ragaCount;
+  ragaList=pool; currentIdx=0;
   document.getElementById('raga-display').classList.remove('visible');
   document.getElementById('raga-name').textContent='—';
   document.getElementById('countdown-num').textContent='—';
@@ -889,7 +940,7 @@ function endChallenge(){
 function showResultsScreen(){
   document.getElementById('res-stat-ragas').textContent=currentIdx;
   document.getElementById('res-stat-time').textContent=challengeElapsed+'s';
-  document.getElementById('res-stat-diff').textContent=difficulty[0].toUpperCase()+difficulty.slice(1);
+  document.getElementById('res-stat-diff').textContent=modeLabel();
   const list=document.getElementById('results-list');
   list.innerHTML='';
   const presented=ragaList.slice(0,currentIdx);
@@ -901,13 +952,21 @@ function showResultsScreen(){
     li.append(rn,rt);
     list.appendChild(li);
   });
+  const revealEl=document.getElementById('surprise-reveal');
+  if(difficulty==='surpriseMe' && activeTheme){
+    document.getElementById('surprise-theme-name').textContent=activeTheme.name;
+    document.getElementById('surprise-reveal-text').textContent=activeTheme.reveal;
+    revealEl.style.display='block';
+  } else {
+    revealEl.style.display='none';
+  }
   showScreen('results-screen');
 }
 
 function goToDoneScreen(){
   document.getElementById('stat-ragas').textContent=currentIdx;
   document.getElementById('stat-time').textContent=challengeElapsed+'s';
-  document.getElementById('stat-diff').textContent=difficulty[0].toUpperCase()+difficulty.slice(1);
+  document.getElementById('stat-diff').textContent=modeLabel();
   showScreen('done-screen');
   if(mp4Blob){
     enableDownloadButton();

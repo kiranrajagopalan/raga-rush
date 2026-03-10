@@ -981,6 +981,7 @@ function goToDoneScreen(){
 }
 
 function enableDownloadButton(){
+  document.getElementById('conv-overlay').classList.remove('active');
   const btn=document.getElementById('dl-btn');
   const canShare=navigator.canShare&&navigator.canShare({files:[new File([],'x.mp4',{type:'video/mp4'})]});
   btn.textContent=canShare?'📲 Share Video':'⬇ Download MP4';

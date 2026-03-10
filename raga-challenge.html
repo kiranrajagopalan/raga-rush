@@ -449,6 +449,7 @@ let _cdDeleteToken=null; // kept private — not on window
 let countdownActive=false, countdownText='';
 let challengeElapsed=0, mp4Blob=null, uploadFailed=false, nativeMp4=false;
 let endCardActive=false, endCardStart=0;
+let slotOffset=0, cachedGrads={};
 
 window.addEventListener('beforeunload',()=>{ if(mediaStream) mediaStream.getTracks().forEach(t=>t.stop()); });
 
@@ -632,10 +633,12 @@ function runSlotMachine(target, onDone){
       const p=(el-SPIN_MS)/DECEL_MS;
       pos=spinDist+(1-Math.pow(1-p,3))*decelDist; // cubic ease-out
     }
-    inner.style.transform='translateY('+(startY-pos)+'px)';
+    slotOffset=startY-pos;
+    inner.style.transform='translateY('+slotOffset+'px)';
     const ci=Math.min(items.length-1, Math.round(pos/ITEM_H));
     inner.querySelectorAll('.slot-item').forEach((e,i)=>e.classList.toggle('center',i===ci));
     if(el>=TOTAL_MS){
+      slotOffset=finalY;
       inner.style.transform='translateY('+finalY+'px)';
       inner.querySelectorAll('.slot-item').forEach((e,i)=>e.classList.toggle('center',i===items.length-1));
       setTimeout(()=>{ wrap.classList.remove('active'); onDone(); },700);
@@ -684,18 +687,32 @@ function startRecording(){
   const app=document.getElementById('app');
   const video=document.getElementById('video-bg');
   const W=app.offsetWidth, H=app.offsetHeight;
-  // Scale canvas by device pixel ratio (capped at 2×) for sharper recording
-  const dpr=Math.min(window.devicePixelRatio||1,2);
-  const CW=Math.round(W*dpr), CH=Math.round(H*dpr);
+  // Record at 1× DPR — logical pixels are sufficient for social video
+  const dpr=1;
+  const CW=W, CH=H;
   recCanvas=document.createElement('canvas');
   recCanvas.width=CW; recCanvas.height=CH;
   recCtx=recCanvas.getContext('2d');
-  const cs=recCanvas.captureStream(30);
+  // Pre-cache all gradients used in drawLoop (they're fixed for this recording session)
+  const TOP_H=H*0.15, MID_H=H*0.55, BOT_Y=H*0.70, BOT_H=H*0.30;
+  const wH=192, wY=BOT_Y+(BOT_H-192)/2;
+  const g1=recCtx.createLinearGradient(0,TOP_H,0,TOP_H+MID_H*0.35);
+  g1.addColorStop(0,'rgba(0,0,0,0.7)'); g1.addColorStop(1,'rgba(0,0,0,0)');
+  const g2=recCtx.createLinearGradient(0,BOT_Y-MID_H*0.25,0,BOT_Y);
+  g2.addColorStop(0,'rgba(0,0,0,0)'); g2.addColorStop(1,'rgba(0,0,0,0.7)');
+  const g3=recCtx.createLinearGradient(0,wY,0,wY+wH*0.38);
+  g3.addColorStop(0,'rgba(0,0,0,0.95)'); g3.addColorStop(1,'rgba(0,0,0,0)');
+  const g4=recCtx.createLinearGradient(0,wY+wH*0.62,0,wY+wH);
+  g4.addColorStop(0,'rgba(0,0,0,0)'); g4.addColorStop(1,'rgba(0,0,0,0.95)');
+  const g5=recCtx.createRadialGradient(W/2,0,0,W/2,0,W*0.8);
+  g5.addColorStop(0,'rgba(26,16,0,0.8)'); g5.addColorStop(1,'rgba(0,0,0,0)');
+  cachedGrads={topFade:g1,botFade:g2,slotTop:g3,slotBot:g4,endBg:g5};
+  const cs=recCanvas.captureStream(24);
   mediaStream.getAudioTracks().forEach(t=>cs.addTrack(t));
   const mimes=['video/mp4;codecs=h264,aac','video/mp4','video/webm;codecs=vp9,opus','video/webm;codecs=vp8,opus','video/webm'];
   const mime=mimes.find(m=>MediaRecorder.isTypeSupported(m))||'video/webm';
   nativeMp4=mime.startsWith('video/mp4');
-  mediaRecorder=new MediaRecorder(cs,{mimeType:mime,videoBitsPerSecond:8000000});
+  mediaRecorder=new MediaRecorder(cs,{mimeType:mime,videoBitsPerSecond:2500000});
   mediaRecorder.ondataavailable=e=>{ if(e.data.size>0) chunks.push(e.data); };
   isRecording=true; drawRunning=true;
   mediaRecorder.start(100); startTime=Date.now();
@@ -729,13 +746,9 @@ function drawLoop(video,W,H,dpr=1){
   ctx.fillRect(0,0,W,TOP_H);
   ctx.fillRect(0,BOT_Y,W,BOT_H);
 
-  // ── Gradient overlays (constrained to camera section) ──
-  let g=ctx.createLinearGradient(0,TOP_H,0,TOP_H+MID_H*0.35);
-  g.addColorStop(0,'rgba(0,0,0,0.7)'); g.addColorStop(1,'rgba(0,0,0,0)');
-  ctx.fillStyle=g; ctx.fillRect(0,TOP_H,W,MID_H*0.35);
-  g=ctx.createLinearGradient(0,BOT_Y-MID_H*0.25,0,BOT_Y);
-  g.addColorStop(0,'rgba(0,0,0,0)'); g.addColorStop(1,'rgba(0,0,0,0.7)');
-  ctx.fillStyle=g; ctx.fillRect(0,BOT_Y-MID_H*0.25,W,MID_H*0.25);
+  // ── Gradient overlays (constrained to camera section) — use cached ──
+  ctx.fillStyle=cachedGrads.topFade; ctx.fillRect(0,TOP_H,W,MID_H*0.35);
+  ctx.fillStyle=cachedGrads.botFade; ctx.fillRect(0,BOT_Y-MID_H*0.25,W,MID_H*0.25);
 
   // ── 3-2-1-GO countdown (baked into recording) ──
   if(countdownActive && countdownText){
@@ -762,10 +775,7 @@ function drawLoop(video,W,H,dpr=1){
     // Dark background with subtle warm gradient
     ctx.fillStyle='#000';
     ctx.fillRect(0,0,W,H);
-    const rg=ctx.createRadialGradient(W/2,0,0,W/2,0,W*0.8);
-    rg.addColorStop(0,'rgba(26,16,0,0.8)');
-    rg.addColorStop(1,'rgba(0,0,0,0)');
-    ctx.fillStyle=rg;
+    ctx.fillStyle=cachedGrads.endBg;
     ctx.fillRect(0,0,W,H);
 
     // "CHALLENGE COMPLETE" header
@@ -850,8 +860,7 @@ function drawLoop(video,W,H,dpr=1){
   if(slotWrap.classList.contains('active')){
     ctx.fillStyle='rgba(0,0,0,0.8)'; ctx.fillRect(0,BOT_Y,W,BOT_H);
     const inner=document.getElementById('slot-inner');
-    const mat=new DOMMatrix(window.getComputedStyle(inner).transform);
-    const ty=mat.m42;
+    const ty=slotOffset;
     const wH=192*dpr, wY=BOT_Y+(BOT_H-192*dpr)/2, IH=64*dpr;
     const fsize=fs(0.082);
     ctx.font='700 '+fsize+'px "Google Sans",sans-serif';
@@ -871,13 +880,9 @@ function drawLoop(video,W,H,dpr=1){
     ctx.beginPath(); ctx.moveTo(W*0.05,l1); ctx.lineTo(W*0.95,l1); ctx.stroke();
     ctx.beginPath(); ctx.moveTo(W*0.05,l2); ctx.lineTo(W*0.95,l2); ctx.stroke();
     ctx.shadowBlur=0;
-    // Fades
-    let gf=ctx.createLinearGradient(0,wY,0,wY+wH*0.38);
-    gf.addColorStop(0,'rgba(0,0,0,0.95)'); gf.addColorStop(1,'rgba(0,0,0,0)');
-    ctx.fillStyle=gf; ctx.fillRect(0,wY,W,wH*0.38);
-    gf=ctx.createLinearGradient(0,wY+wH*0.62,0,wY+wH);
-    gf.addColorStop(0,'rgba(0,0,0,0)'); gf.addColorStop(1,'rgba(0,0,0,0.95)');
-    ctx.fillStyle=gf; ctx.fillRect(0,wY+wH*0.62,W,wH*0.38);
+    // Fades — use cached gradients
+    ctx.fillStyle=cachedGrads.slotTop; ctx.fillRect(0,wY,W,wH*0.38);
+    ctx.fillStyle=cachedGrads.slotBot; ctx.fillRect(0,wY+wH*0.62,W,wH*0.38);
     ctx.font='400 '+fs(0.027)+'px "Google Sans",sans-serif';
     ctx.fillStyle='rgba(255,255,255,0.4)'; ctx.textAlign='center';
     ctx.fillText('PICKING YOUR RAGA…',W/2,wY+wH+28*dpr);

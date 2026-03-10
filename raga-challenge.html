@@ -449,7 +449,8 @@ let _cdDeleteToken=null; // kept private — not on window
 let countdownActive=false, countdownText='';
 let challengeElapsed=0, mp4Blob=null, uploadFailed=false, nativeMp4=false;
 let endCardActive=false, endCardStart=0;
-let slotOffset=0, cachedGrads={};
+let slotOffset=0, cachedGrads={}, lastDrawTime=0;
+const DRAW_INTERVAL=1000/24; // target 24fps draw rate
 
 window.addEventListener('beforeunload',()=>{ if(mediaStream) mediaStream.getTracks().forEach(t=>t.stop()); });
 
@@ -474,7 +475,9 @@ function requestCamera(){ showScreen('perm-screen'); }
 async function startCamera(){
   const btn=document.querySelector('.perm-btn');
   btn.textContent='Starting…'; btn.disabled=true;
-  const tries=[{video:{facingMode:'user'},audio:true},{video:{facingMode:'user'},audio:false},{video:true,audio:false}];
+  // Cap camera at 480p — we only need ~390px wide for recording; 1080p input wastes CPU on every drawImage call
+  const camConstraints={facingMode:'user',width:{ideal:480,max:960},height:{ideal:854,max:1280}};
+  const tries=[{video:camConstraints,audio:true},{video:camConstraints,audio:false},{video:{facingMode:'user'},audio:false},{video:true,audio:false}];
   for(const c of tries){ try{ mediaStream=await navigator.mediaDevices.getUserMedia(c); break; }catch(e){ mediaStream=null; } }
   if(!mediaStream){ btn.textContent='Allow Camera'; btn.disabled=false; alert('Camera access failed.\n\nPlease:\n• Use Chrome or Safari\n• Allow camera permission\n• Ensure no other app uses camera'); return; }
 
@@ -714,13 +717,19 @@ function startRecording(){
   nativeMp4=mime.startsWith('video/mp4');
   mediaRecorder=new MediaRecorder(cs,{mimeType:mime,videoBitsPerSecond:2500000});
   mediaRecorder.ondataavailable=e=>{ if(e.data.size>0) chunks.push(e.data); };
-  isRecording=true; drawRunning=true;
+  isRecording=true; drawRunning=true; lastDrawTime=0;
   mediaRecorder.start(100); startTime=Date.now();
   drawLoop(video,CW,CH,dpr);
 }
 
 function drawLoop(video,W,H,dpr=1){
   if(!drawRunning) return;
+  const now=performance.now();
+  if(now-lastDrawTime<DRAW_INTERVAL){
+    requestAnimationFrame(()=>drawLoop(video,W,H,dpr));
+    return;
+  }
+  lastDrawTime=now;
   const ctx=recCtx;
 
   // ── Section layout constants (15% top / 55% camera / 30% bottom) ──

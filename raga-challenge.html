@@ -28,17 +28,17 @@ html, body {
 .screen.active { display:flex; }
 
 /* ── SETUP ── */
-#setup-screen { background:radial-gradient(ellipse at 50% -10%,#2a1400 0%,#000 65%); padding:5% 8%; gap:0; }
+#setup-screen { background:radial-gradient(ellipse at 50% -10%,#2a1400 0%,#000 65%); padding:4% 8%; gap:0; }
 .mandala-bg {
-  position:absolute; inset:0; opacity:0.05; pointer-events:none;
+  position:absolute; inset:0; opacity:0.12; pointer-events:none;
   background-image:url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' width='300' height='300'%3E%3Ccircle cx='150' cy='150' r='120' fill='none' stroke='%23F5C842' stroke-width='0.8'/%3E%3Ccircle cx='150' cy='150' r='90' fill='none' stroke='%23F5C842' stroke-width='0.8'/%3E%3Ccircle cx='150' cy='150' r='60' fill='none' stroke='%23F5C842' stroke-width='0.8'/%3E%3Ccircle cx='150' cy='150' r='30' fill='none' stroke='%23F5C842' stroke-width='0.8'/%3E%3Cline x1='150' y1='30' x2='150' y2='270' stroke='%23F5C842' stroke-width='0.4'/%3E%3Cline x1='30' y1='150' x2='270' y2='150' stroke='%23F5C842' stroke-width='0.4'/%3E%3Cline x1='65' y1='65' x2='235' y2='235' stroke='%23F5C842' stroke-width='0.4'/%3E%3Cline x1='235' y1='65' x2='65' y2='235' stroke='%23F5C842' stroke-width='0.4'/%3E%3C/svg%3E");
   background-size:300px 300px;
 }
 .app-eyebrow { font-family:var(--garamond); font-size:12px; letter-spacing:5px; color:var(--gold); text-transform:uppercase; margin-bottom:6px; position:relative; font-weight:600; }
 .app-title { font-family:var(--garamond); font-size:clamp(42px,12vw,58px); line-height:0.92; text-align:center; color:white; position:relative; margin-bottom:4px; font-weight:700; }
-.app-subtitle { font-size:11px; color:rgba(255,255,255,0.35); letter-spacing:3px; text-transform:uppercase; margin-bottom:6%; position:relative; }
+.app-subtitle { font-size:11px; color:rgba(255,255,255,0.35); letter-spacing:3px; text-transform:uppercase; margin-bottom:4%; position:relative; }
 .section-label { font-size:10px; letter-spacing:3px; text-transform:uppercase; color:var(--gold); margin-bottom:10px; align-self:flex-start; position:relative; z-index:2; font-weight:500; }
-.option-group { display:flex; gap:8px; width:100%; margin-bottom:5%; position:relative; }
+.option-group { display:flex; gap:8px; width:100%; margin-bottom:4%; position:relative; }
 .opt-btn {
   flex:1; padding:12px 6px; border:1px solid var(--glass-border); background:var(--glass);
   color:rgba(255,255,255,0.55); border-radius:12px; cursor:pointer;
@@ -47,7 +47,11 @@ html, body {
 }
 .opt-btn.selected { background:var(--gold); border-color:var(--gold); color:#000; }
 .opt-btn:hover:not(.selected) { border-color:rgba(255,255,255,0.4); color:white; }
-.diff-desc { font-size:10px; display:block; margin-top:3px; opacity:0.65; font-weight:400; }
+/* Difficulty group — vertical stack */
+#diff-group { flex-direction:column; }
+#diff-group .opt-btn { text-align:left; padding:14px 16px; font-size:16px; font-weight:600; }
+#diff-group .opt-btn[data-val="surpriseMe"] { border-color:rgba(245,200,66,0.3); background:rgba(245,200,66,0.05); }
+#diff-group .opt-btn[data-val="surpriseMe"].selected { background:var(--gold); border-color:var(--gold); color:#000; }
 .start-btn {
   width:100%; padding:5%; background:var(--gold); color:#000; border:none; border-radius:14px;
   font-family:var(--font); font-size:18px; font-weight:700; cursor:pointer;
@@ -254,9 +258,9 @@ html, body {
     <div class="app-subtitle">Improvise · Record · Share</div>
     <div class="section-label">Mode</div>
     <div class="option-group" id="diff-group">
-      <button class="opt-btn selected" data-key="difficulty" data-val="easy" onclick="selectOpt(this,'diff-group')">Easy<span class="diff-desc">7 familiar · 3 stretch</span></button>
-      <button class="opt-btn" data-key="difficulty" data-val="notSoEasy" onclick="selectOpt(this,'diff-group')">Not So Easy<span class="diff-desc">5 medium · 3 hard · 2 easy</span></button>
-      <button class="opt-btn" data-key="difficulty" data-val="surpriseMe" onclick="selectOpt(this,'diff-group')">Surprise Me<span class="diff-desc">5 ragas · themed session</span></button>
+      <button class="opt-btn selected" data-key="difficulty" data-val="easy" onclick="selectOpt(this,'diff-group')">Easy</button>
+      <button class="opt-btn" data-key="difficulty" data-val="notSoEasy" onclick="selectOpt(this,'diff-group')">Not So Easy</button>
+      <button class="opt-btn" data-key="difficulty" data-val="surpriseMe" onclick="selectOpt(this,'diff-group')">✦ Surprise Me</button>
     </div>
     <div class="section-label">Seconds per Raga</div>
     <div class="option-group" id="time-group">

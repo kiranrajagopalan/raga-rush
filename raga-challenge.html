@@ -62,12 +62,6 @@ html, body {
 #setup-screen > .start-btn { width:calc(100% - 16%); margin:0 8% 4%; flex-shrink:0; }
 .start-btn:hover { transform:translateY(-2px); }
 
-/* ── PERMISSION ── */
-#perm-screen { background:#000; padding:8%; gap:5%; text-align:center; }
-.perm-icon { font-size:56px; }
-.perm-title { font-size:28px; font-weight:700; }
-.perm-sub { font-size:14px; color:rgba(255,255,255,0.45); line-height:1.6; }
-.perm-btn { width:100%; padding:5%; background:var(--gold); color:#000; border:none; border-radius:14px; font-family:var(--font); font-size:18px; font-weight:700; cursor:pointer; }
 
 /* ── PREVIEW SCREEN — same 3-section layout as challenge screen ── */
 #preview-screen { background:#000; flex-direction:column; align-items:stretch; justify-content:flex-start; }
@@ -210,26 +204,18 @@ html, body {
 .surprise-theme-name { font-size:14px; font-weight:700; color:var(--gold); letter-spacing:0.5px; margin-bottom:6px; }
 .surprise-reveal-text { font-size:13px; color:rgba(255,255,255,0.6); line-height:1.5; font-style:italic; }
 .done-actions { width:100%; padding:0 8% 4%; display:flex; flex-direction:column; gap:10px; flex-shrink:0; }
-.download-btn { width:100%; padding:5%; background:var(--gold); color:#000; border:none; border-radius:14px; font-family:var(--font); font-size:18px; font-weight:700; cursor:pointer; box-shadow:0 8px 32px rgba(245,200,66,0.45); transition:transform 0.15s,opacity 0.2s; }
+.download-btn { position:relative; overflow:hidden; width:100%; padding:5%; background:var(--gold); color:#000; border:none; border-radius:14px; font-family:var(--font); font-size:18px; font-weight:700; cursor:pointer; box-shadow:0 8px 32px rgba(245,200,66,0.45); transition:transform 0.15s,opacity 0.2s; }
 .download-btn:hover:not(:disabled) { transform:translateY(-2px); }
 .download-btn:disabled { opacity:0.5; cursor:not-allowed; }
-.restart-btn { background:transparent; border:1px solid var(--glass-border); color:rgba(255,255,255,0.45); padding:4%; border-radius:12px; width:100%; font-family:var(--font); font-size:14px; font-weight:500; cursor:pointer; transition:all 0.2s; }
-.restart-btn:hover { border-color:white; color:white; }
-#conv-overlay { display:none; position:absolute; inset:0; background:rgba(0,0,0,0.94); flex-direction:column; align-items:center; justify-content:center; gap:18px; z-index:50; padding:10%; text-align:center; }
-#conv-overlay.active { display:flex; }
-.conv-emoji { font-size:52px; animation:convPulse 1.4s ease-in-out infinite; }
-@keyframes convPulse { 0%,100%{transform:scale(1)} 50%{transform:scale(1.15)} }
-.conv-title { font-size:22px; font-weight:700; color:var(--gold); }
-.conv-sub   { font-size:14px; color:rgba(255,255,255,0.6); min-height:22px; }
-.conv-track { width:82%; height:6px; background:rgba(255,255,255,0.1); border-radius:6px; overflow:hidden; }
-.conv-fill  { height:100%; background:linear-gradient(90deg,var(--gold),#ffaa00); width:0%; transition:width 0.5s ease; border-radius:6px; box-shadow:0 0 12px rgba(245,200,66,0.6); }
-.conv-stages { display:flex; gap:8px; margin-top:4px; }
-.conv-stage { width:8px; height:8px; border-radius:50%; background:rgba(255,255,255,0.15); transition:background 0.3s; }
-.conv-stage.done { background:var(--gold); }
-.conv-stage.active-stage { background:white; animation:stagePulse 0.7s ease-in-out infinite; }
-@keyframes stagePulse { 0%,100%{opacity:1} 50%{opacity:0.3} }
-.conv-skip { background:transparent; border:1px solid rgba(255,255,255,0.2); color:rgba(255,255,255,0.45); padding:10px 24px; border-radius:10px; font-family:var(--font); font-size:13px; font-weight:500; cursor:pointer; margin-top:6px; transition:all 0.2s; }
-.conv-skip:hover { border-color:white; color:white; }
+.download-btn.processing { opacity:0.75; cursor:default; }
+.download-btn.processing:hover { transform:none; }
+.btn-progress { position:absolute; bottom:0; left:0; height:3px; background:rgba(0,0,0,0.25); border-radius:0 0 14px 14px; transition:width 0.5s ease; width:0%; pointer-events:none; }
+.dl-skip-link { display:none; text-align:center; font-size:12px; color:rgba(255,255,255,0.3); cursor:pointer; padding:2px 0 4px; font-family:var(--font); transition:color 0.2s; }
+.dl-skip-link:hover { color:rgba(255,255,255,0.6); }
+.invite-btn { width:100%; padding:4.5%; background:transparent; border:1px solid var(--gold); color:var(--gold); border-radius:14px; font-family:var(--font); font-size:16px; font-weight:600; cursor:pointer; transition:all 0.2s; letter-spacing:0.3px; }
+.invite-btn:hover { background:rgba(245,200,66,0.1); }
+.restart-btn { background:transparent; border:none; padding:3% 0; color:rgba(255,255,255,0.3); font-family:var(--font); font-size:13px; font-weight:400; cursor:pointer; transition:color 0.2s; letter-spacing:0.5px; width:100%; text-align:center; }
+.restart-btn:hover { color:rgba(255,255,255,0.6); }
 
 /* Results screen removed — merged into done-screen */
 </style>
@@ -263,14 +249,6 @@ html, body {
       </div>
     </div>
     <button class="start-btn" onclick="requestCamera()">Begin Challenge →</button>
-  </div>
-
-  <!-- PERMISSION -->
-  <div id="perm-screen" class="screen">
-    <div class="perm-icon">🎙️</div>
-    <div class="perm-title">Camera Access</div>
-    <div class="perm-sub">Your camera records the full challenge with overlays baked in — ready to post on Reels.</div>
-    <button class="perm-btn" onclick="startCamera()">Allow Camera</button>
   </div>
 
   <!-- PREVIEW — mirrors challenge layout so user sees exact framing -->
@@ -353,20 +331,6 @@ html, body {
 
   <!-- DONE (merged results + done) -->
   <div id="done-screen" class="screen">
-    <!-- Processing overlay — shown while video converts -->
-    <div id="conv-overlay">
-      <div class="conv-emoji" id="conv-emoji">🎬</div>
-      <div class="conv-title" id="conv-title">Processing…</div>
-      <div class="conv-sub" id="conv-sub">Getting ready…</div>
-      <div class="conv-track"><div class="conv-fill" id="conv-fill"></div></div>
-      <div class="conv-stages">
-        <div class="conv-stage" id="cs0"></div>
-        <div class="conv-stage" id="cs1"></div>
-        <div class="conv-stage" id="cs2"></div>
-        <div class="conv-stage" id="cs3"></div>
-      </div>
-      <button class="conv-skip" id="conv-skip" onclick="skipToWebm()" style="display:none">Skip → Save WebM</button>
-    </div>
     <!-- Scrollable content -->
     <div class="done-scroll">
       <div class="done-eyebrow">Challenge Complete</div>
@@ -386,6 +350,8 @@ html, body {
     <!-- Sticky action buttons -->
     <div class="done-actions">
       <button class="download-btn" id="dl-btn" onclick="shareOrDownload()" disabled>⏳ Preparing…</button>
+      <span class="dl-skip-link" id="dl-skip" onclick="skipToWebm()">Skip — Save WebM instead</span>
+      <button class="invite-btn" onclick="inviteFriend()">🔗 Invite a Friend</button>
       <button class="restart-btn" onclick="restart()">New Challenge</button>
     </div>
   </div>
@@ -454,14 +420,14 @@ function selectOpt(btn, groupId) {
   if(k==='ragaCount') ragaCount=parseInt(v);
 }
 
-function requestCamera(){ showScreen('perm-screen'); }
+function requestCamera(){ startCamera(); }
 
 async function startCamera(){
-  const btn=document.querySelector('.perm-btn');
-  btn.textContent='Starting…'; btn.disabled=true;
+  const btn=document.querySelector('#setup-screen > .start-btn');
+  btn.textContent='Starting camera…'; btn.disabled=true;
   const tries=[{video:{facingMode:'user'},audio:true},{video:{facingMode:'user'},audio:false},{video:true,audio:false}];
   for(const c of tries){ try{ mediaStream=await navigator.mediaDevices.getUserMedia(c); break; }catch(e){ mediaStream=null; } }
-  if(!mediaStream){ btn.textContent='Allow Camera'; btn.disabled=false; alert('Camera access failed.\n\nPlease:\n• Use Chrome or Safari\n• Allow camera permission\n• Ensure no other app uses camera'); return; }
+  if(!mediaStream){ btn.textContent='Begin Challenge →'; btn.disabled=false; alert('Camera access failed.\n\nPlease:\n• Use Chrome or Safari\n• Allow camera permission\n• Ensure no other app uses camera'); return; }
 
   // Feed same stream into both preview-video and video-bg
   const previewVideo=document.getElementById('preview-video');
@@ -479,7 +445,7 @@ async function startCamera(){
   document.getElementById('prev-count').textContent=ragaCount+' ragas';
 
   showScreen('preview-screen');
-  btn.textContent='Allow Camera'; btn.disabled=false;
+  btn.textContent='Begin Challenge →'; btn.disabled=false;
 }
 
 function goBack(){
@@ -701,7 +667,7 @@ function startRecording(){
   mediaRecorder.ondataavailable=e=>{ if(e.data.size>0) chunks.push(e.data); };
   isRecording=true; drawRunning=true; lastDrawTime=0;
   mediaRecorder.start(100); startTime=Date.now();
-  drawLoop(video,CW,CH,dpr);
+  document.fonts.ready.then(()=>drawLoop(video,CW,CH,dpr));
 }
 
 function drawLoop(video,W,H,dpr=1){
@@ -740,6 +706,10 @@ function drawLoop(video,W,H,dpr=1){
   // ── Gradient overlays (constrained to camera section) — use cached ──
   ctx.fillStyle=cachedGrads.topFade; ctx.fillRect(0,TOP_H,W,MID_H*0.35);
   ctx.fillStyle=cachedGrads.botFade; ctx.fillRect(0,BOT_Y-MID_H*0.25,W,MID_H*0.25);
+
+  // ── Gold separator line (top bar / camera boundary) ──
+  ctx.strokeStyle='rgba(245,200,66,0.2)'; ctx.lineWidth=1;
+  ctx.beginPath(); ctx.moveTo(0,TOP_H); ctx.lineTo(W,TOP_H); ctx.stroke();
 
   // ── 3-2-1-GO countdown (baked into recording) ──
   if(countdownActive && countdownText){
@@ -822,6 +792,17 @@ function drawLoop(video,W,H,dpr=1){
       ctx.globalAlpha=1;
     }
 
+    // ── Brand attribution at bottom of end card ──
+    const brandAlpha=Math.min(1,Math.max(0,(elapsed-statsDelay)/0.3));
+    if(brandAlpha>0){
+      ctx.globalAlpha=brandAlpha*0.4;
+      ctx.font='500 '+efs(0.025)+'px "DM Sans",sans-serif';
+      ctx.fillStyle='#F5C842';
+      ctx.textAlign='center';
+      ctx.fillText('\u2726 RAGA CHALLENGE',W/2,H*0.96);
+      ctx.globalAlpha=1;
+    }
+
     requestAnimationFrame(()=>drawLoop(video,W,H,dpr));
     return;
   }
@@ -829,22 +810,28 @@ function drawLoop(video,W,H,dpr=1){
   const topY=TOP_H*0.60;   // vertically centred in the 15% top strip
   const fs=s=>Math.round(W*s);
 
+  // ── REC indicator dot (pulsing, top-left before counter) ──
+  const recDotVisible=Math.floor(Date.now()/700)%2===0;
+  if(recDotVisible){
+    ctx.fillStyle='#E63946';
+    ctx.beginPath(); ctx.arc(W*0.055,topY-3,W*0.013,0,Math.PI*2); ctx.fill();
+  }
+
   // ── Counter ──
   ctx.font='500 '+fs(0.034)+'px "DM Sans",sans-serif';
   ctx.fillStyle='rgba(255,255,255,0.75)'; ctx.textAlign='left';
-  ctx.fillText(document.getElementById('raga-counter').textContent, W*0.07, topY);
+  ctx.fillText(document.getElementById('raga-counter').textContent, W*0.10, topY);
+
+  // ── Brand name (center) ──
+  ctx.font='500 '+fs(0.022)+'px "DM Sans",sans-serif';
+  ctx.fillStyle='rgba(245,200,66,0.5)';
+  ctx.textAlign='center';
+  ctx.fillText('\u2726 RAGA CHALLENGE', W/2, topY);
 
   // ── Difficulty ──
   ctx.font='500 '+fs(0.028)+'px "DM Sans",sans-serif';
   ctx.fillStyle='#F5C842'; ctx.textAlign='right';
   ctx.fillText(difficulty.toUpperCase(), W*0.93, topY);
-
-  // ── REC dot + label ──
-  ctx.fillStyle='#E63946';
-  ctx.beginPath(); ctx.arc(W/2-W*0.06,topY-4,W*0.018,0,Math.PI*2); ctx.fill();
-  ctx.font='500 '+fs(0.028)+'px "DM Sans",sans-serif';
-  ctx.textAlign='center';
-  ctx.fillText('REC',W/2+W*0.028,topY);
 
   // ── Slot machine (when active) ──
   const slotWrap=document.getElementById('slot-wrap');
@@ -978,13 +965,18 @@ function showResultsScreen(){
     btn.textContent='⬇ Save WebM';
     btn.disabled=false;
   } else {
-    document.getElementById('conv-overlay').classList.add('active');
+    const btn=document.getElementById('dl-btn');
+    btn.innerHTML='<span id="dl-label">⏳ Preparing…</span><span class="btn-progress" id="btn-progress"></span>';
+    btn.classList.add('processing');
+    btn.disabled=true;
   }
 }
 
 function enableDownloadButton(){
-  document.getElementById('conv-overlay').classList.remove('active');
   const btn=document.getElementById('dl-btn');
+  const pb=document.getElementById('btn-progress');
+  if(pb){ pb.style.width='100%'; }
+  btn.classList.remove('processing');
   const canShare=navigator.canShare&&navigator.canShare({files:[new File([],'x.mp4',{type:'video/mp4'})]});
   btn.textContent=canShare?'📲 Share Video':'⬇ Download MP4';
   btn.disabled=false;
@@ -995,10 +987,11 @@ const CLOUDINARY_PRESET='forRagaChallange';
 let mp4Url=null;
 
 function skipToWebm(){
-  document.getElementById('conv-overlay').classList.remove('active');
   const btn=document.getElementById('dl-btn');
+  btn.classList.remove('processing');
   btn.textContent='⬇ Save WebM';
   btn.disabled=false;
+  document.getElementById('dl-skip').style.display='none';
   mp4Url=null; mp4Blob=null;
 }
 
@@ -1020,17 +1013,12 @@ async function processVideoInBackground(){
 
   finalBlob=new Blob(chunks,{type:'video/webm'});
 
-  const ov=document.getElementById('conv-overlay');
   const isOnDone=()=>document.getElementById('done-screen').classList.contains('active');
 
-  if(isOnDone()){
-    ov.classList.add('active');
-    document.getElementById('conv-skip').style.display='none';
-  }
   setConv(5,'Uploading video…');
 
   const skipTimer=setTimeout(()=>{
-    document.getElementById('conv-skip').style.display='block';
+    if(isOnDone()) document.getElementById('dl-skip').style.display='block';
   }, 8000);
 
   try{
@@ -1068,15 +1056,10 @@ async function processVideoInBackground(){
     mp4Blob=await fetchRes.blob();
 
     clearTimeout(skipTimer);
-    setConv(100,'Your video is ready!');
-    document.getElementById('conv-emoji').textContent='🎉';
-    document.getElementById('conv-title').textContent='Done!';
+    setConv(100,'Ready!');
 
     if(isOnDone()){
-      setTimeout(()=>{
-        ov.classList.remove('active');
-        enableDownloadButton();
-      },800);
+      setTimeout(()=>{ enableDownloadButton(); }, 600);
     }
 
   }catch(e){
@@ -1084,38 +1067,19 @@ async function processVideoInBackground(){
     uploadFailed=true;
     mp4Url=null; mp4Blob=null;
     if(isOnDone()){
-      ov.classList.remove('active');
       const btn=document.getElementById('dl-btn');
+      btn.classList.remove('processing');
       btn.textContent='⬇ Save WebM';
       btn.disabled=false;
     }
   }
 }
 
-const CONV_STAGES=[
-  {pct:0,  emoji:'🎬', title:'Packaging…',    sub:'Wrapping your performance'},
-  {pct:25, emoji:'☁️', title:'Uploading…',     sub:'Sending to the cloud'},
-  {pct:75, emoji:'⚡', title:'Converting…',    sub:'WebM → MP4 magic'},
-  {pct:95, emoji:'✨', title:'Almost there!',  sub:'Polishing the final cut'},
-];
 function setConv(pct,msg){
-  document.getElementById('conv-fill').style.width=pct+'%';
-  document.getElementById('conv-sub').textContent=msg;
-  // Update stage dots (4 stages at 0/25/75/95)
-  const thresholds=[0,25,75,95];
-  thresholds.forEach((t,i)=>{
-    const el=document.getElementById('cs'+i);
-    if(!el) return;
-    el.className='conv-stage'+(pct>t?' done':(pct===t||Math.abs(pct-t)<15)?' active-stage':'');
-  });
-  // Swap emoji + title at stage boundaries
-  for(let i=CONV_STAGES.length-1;i>=0;i--){
-    if(pct>=CONV_STAGES[i].pct){
-      document.getElementById('conv-emoji').textContent=CONV_STAGES[i].emoji;
-      document.getElementById('conv-title').textContent=CONV_STAGES[i].title;
-      break;
-    }
-  }
+  const lb=document.getElementById('dl-label');
+  const pb=document.getElementById('btn-progress');
+  if(lb) lb.textContent='⏳ '+msg;
+  if(pb) pb.style.width=pct+'%';
 }
 
 async function deleteFromCloudinary(){
@@ -1162,6 +1126,22 @@ async function shareOrDownload(){
   setTimeout(deleteFromCloudinary,3000);
 }
 
+async function inviteFriend(){
+  const text=`I just sang ${currentIdx} Carnatic raga${currentIdx===1?'':'s'} in a row 🎵 Can you beat that? Try the Raga Challenge: https://kiranrajagopalan.github.io/raga-challenge/`;
+  if(navigator.share){
+    try{ await navigator.share({title:'Raga Challenge',text}); }catch(e){}
+  } else {
+    try{
+      await navigator.clipboard.writeText(text);
+      // Brief "Copied!" toast
+      const btn=document.querySelector('.invite-btn');
+      const orig=btn.textContent;
+      btn.textContent='✓ Copied!';
+      setTimeout(()=>{ btn.textContent=orig; }, 2000);
+    }catch(e){}
+  }
+}
+
 function restart(){
   if(mediaStream){ mediaStream.getTracks().forEach(t=>t.stop()); mediaStream=null; }
   document.getElementById('preview-video').srcObject=null;
@@ -1171,8 +1151,11 @@ function restart(){
   countdownActive=false; countdownText='';
   challengeElapsed=0; uploadFailed=false; nativeMp4=false;
   endCardActive=false; endCardStart=0;
-  document.getElementById('dl-btn').textContent='⏳ Preparing…';
-  document.getElementById('dl-btn').disabled=true;
+  const dlBtn=document.getElementById('dl-btn');
+  dlBtn.classList.remove('processing');
+  dlBtn.textContent='⏳ Preparing…';
+  dlBtn.disabled=true;
+  document.getElementById('dl-skip').style.display='none';
   showScreen('setup-screen');
 }
 

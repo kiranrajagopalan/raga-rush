@@ -438,7 +438,7 @@ let recCanvas=null, recCtx=null, drawRunning=false;
 let finalBlob=null;
 let _cdDeleteToken=null; // kept private — not on window
 let countdownActive=false, countdownText='';
-let challengeElapsed=0, mp4Blob=null, uploadFailed=false;
+let challengeElapsed=0, mp4Blob=null, uploadFailed=false, nativeMp4=false;
 let endCardActive=false, endCardStart=0;
 
 window.addEventListener('beforeunload',()=>{ if(mediaStream) mediaStream.getTracks().forEach(t=>t.stop()); });
@@ -683,8 +683,9 @@ function startRecording(){
   recCtx=recCanvas.getContext('2d');
   const cs=recCanvas.captureStream(30);
   mediaStream.getAudioTracks().forEach(t=>cs.addTrack(t));
-  const mimes=['video/webm;codecs=vp9,opus','video/webm;codecs=vp8,opus','video/webm'];
+  const mimes=['video/mp4;codecs=h264,aac','video/mp4','video/webm;codecs=vp9,opus','video/webm;codecs=vp8,opus','video/webm'];
   const mime=mimes.find(m=>MediaRecorder.isTypeSupported(m))||'video/webm';
+  nativeMp4=mime.startsWith('video/mp4');
   mediaRecorder=new MediaRecorder(cs,{mimeType:mime,videoBitsPerSecond:8000000});
   mediaRecorder.ondataavailable=e=>{ if(e.data.size>0) chunks.push(e.data); };
   isRecording=true; drawRunning=true;
@@ -1003,8 +1004,18 @@ async function processVideoInBackground(){
     uploadFailed=true;
     return;
   }
-  finalBlob=new Blob(chunks,{type:'video/webm'});
   uploadFailed=false;
+
+  // Native MP4 path (Safari/iOS) — no Cloudinary needed
+  if(nativeMp4){
+    finalBlob=new Blob(chunks,{type:'video/mp4'});
+    mp4Blob=finalBlob;
+    const isOnDone=()=>document.getElementById('done-screen').classList.contains('active');
+    if(isOnDone()) enableDownloadButton();
+    return;
+  }
+
+  finalBlob=new Blob(chunks,{type:'video/webm'});
 
   const ov=document.getElementById('conv-overlay');
   const isOnDone=()=>document.getElementById('done-screen').classList.contains('active');
@@ -1155,7 +1166,7 @@ function restart(){
   chunks=[]; finalBlob=null; mp4Url=null; mp4Blob=null;
   isRecording=false; drawRunning=false; currentIdx=0;
   countdownActive=false; countdownText='';
-  challengeElapsed=0; uploadFailed=false;
+  challengeElapsed=0; uploadFailed=false; nativeMp4=false;
   endCardActive=false; endCardStart=0;
   document.getElementById('dl-btn').textContent='⏳ Preparing…';
   document.getElementById('dl-btn').disabled=true;

@@ -562,7 +562,7 @@ function setupChallenge(){
 
   shuffle(pool);
   ragaCount=difficulty==='surpriseMe'?5:ragaCount;
-  ragaList=pool; currentIdx=0;
+  ragaList=pool.slice(0,ragaCount); currentIdx=0;
   document.getElementById('raga-display').classList.remove('visible');
   document.getElementById('raga-name').textContent='—';
   document.getElementById('countdown-num').textContent='—';
@@ -590,7 +590,7 @@ function revealRaga(){
 function runSlotMachine(target, onDone){
   const wrap=document.getElementById('slot-wrap');
   const inner=document.getElementById('slot-inner');
-  const pool=RAGAS[difficulty];
+  const pool=RAGAS[difficulty]||RAGAS.easy;
   const items=[];
   for(let i=0;i<20;i++) items.push(pool[Math.floor(Math.random()*pool.length)]);
   items.push(target);

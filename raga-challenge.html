@@ -69,41 +69,31 @@ html, body {
 .perm-sub { font-size:14px; color:rgba(255,255,255,0.45); line-height:1.6; }
 .perm-btn { width:100%; padding:5%; background:var(--gold); color:#000; border:none; border-radius:14px; font-family:var(--font); font-size:18px; font-weight:700; cursor:pointer; }
 
-/* ── PREVIEW SCREEN ── */
-#preview-screen { background:#000; }
+/* ── PREVIEW SCREEN — same 3-section layout as challenge screen ── */
+#preview-screen { background:#000; flex-direction:column; align-items:stretch; justify-content:flex-start; }
 #preview-video { position:absolute; inset:0; width:100%; height:100%; object-fit:cover; transform:scaleX(-1); }
-#preview-overlay {
-  position:absolute; inset:0; z-index:5;
-  display:flex; flex-direction:column; align-items:center; justify-content:flex-end;
-  padding-bottom:10%;
-  background:linear-gradient(to top, rgba(0,0,0,0.85) 0%, rgba(0,0,0,0.1) 50%, transparent 100%);
-}
-.preview-hint {
-  font-size:12px; letter-spacing:3px; text-transform:uppercase;
-  color:rgba(255,255,255,0.45); margin-bottom:10px; font-weight:400;
-}
-.preview-title {
-  font-size:20px; font-weight:700; color:white;
-  margin-bottom:28px; text-align:center; line-height:1.3;
-  padding:0 10%;
-}
-.preview-settings {
-  display:flex; gap:10px; margin-bottom:28px;
-}
+.preview-top { flex:0 0 15%; display:flex; align-items:center; justify-content:center; padding:0 7%; background:#000; z-index:10; }
+.preview-settings { display:flex; gap:8px; flex-wrap:wrap; justify-content:center; }
 .preview-pill {
-  font-size:11px; letter-spacing:2px; text-transform:uppercase;
-  padding:5px 14px; border-radius:20px;
+  font-size:10px; letter-spacing:2px; text-transform:uppercase;
+  padding:5px 12px; border-radius:20px;
   border:1px solid var(--glass-border); background:var(--glass);
   backdrop-filter:blur(8px); color:rgba(255,255,255,0.65); font-weight:500;
 }
-.preview-pill span { color:var(--gold); }
+.preview-bottom {
+  flex:0 0 30%; display:flex; flex-direction:column; align-items:center;
+  justify-content:center; gap:12px; padding:14px 7% 16px; background:#000;
+}
+.preview-hint {
+  font-size:11px; letter-spacing:3px; text-transform:uppercase;
+  color:rgba(255,255,255,0.35); font-weight:400; text-align:center;
+}
 #start-rec-btn {
-  width:80%; padding:5.5%; background:var(--red); color:white;
-  border:none; border-radius:60px; font-family:var(--font);
+  width:100%; padding:5%; background:var(--red); color:white;
+  border:none; border-radius:14px; font-family:var(--font);
   font-size:18px; font-weight:700; cursor:pointer;
-  box-shadow:0 0 0 0 rgba(230,57,70,0.5);
-  animation:pulse 2s infinite;
-  transition:transform 0.15s;
+  box-shadow:0 8px 32px rgba(230,57,70,0.45);
+  animation:pulse 2s infinite; transition:transform 0.15s;
 }
 #start-rec-btn:active { transform:scale(0.96); animation:none; }
 @keyframes pulse {
@@ -112,10 +102,9 @@ html, body {
   100% { box-shadow:0 0 0 0 rgba(230,57,70,0); }
 }
 .preview-back {
-  margin-top:14px; background:transparent; border:none;
-  color:rgba(255,255,255,0.35); font-family:var(--font);
-  font-size:13px; font-weight:400; cursor:pointer;
-  letter-spacing:1px;
+  background:transparent; border:none; padding:0;
+  color:rgba(255,255,255,0.3); font-family:var(--font);
+  font-size:13px; font-weight:400; cursor:pointer; letter-spacing:0.5px;
 }
 
 /* 3-2-1 Countdown overlay */
@@ -169,7 +158,7 @@ html, body {
 .sel-line.top { top:32%; }
 .sel-line.bot { bottom:32%; }
 #slot-inner { display:flex; flex-direction:column; align-items:center; will-change:transform; }
-.slot-item { font-family:var(--font); font-weight:700; font-size:clamp(22px,6.5vw,34px); height:64px; line-height:64px; text-align:center; white-space:nowrap; padding:0 20px; color:rgba(255,255,255,0.22); }
+.slot-item { font-family:var(--garamond); font-weight:600; font-size:clamp(20px,6vw,30px); height:64px; line-height:64px; text-align:center; white-space:nowrap; padding:0 20px; color:rgba(255,255,255,0.22); }
 .slot-item.center { color:white; text-shadow:0 0 30px rgba(245,200,66,0.7); }
 .slot-hint { margin-top:18px; font-size:11px; letter-spacing:3px; color:rgba(255,255,255,0.45); text-transform:uppercase; font-weight:400; }
 
@@ -202,16 +191,25 @@ html, body {
 #flash { position:absolute; inset:0; background:white; opacity:0; pointer-events:none; z-index:30; }
 #flash.on { opacity:0.2; }
 
-/* ── DONE SCREEN ── */
-#done-screen { background:radial-gradient(ellipse at 50% 20%,#1a1000 0%,#000 70%); padding:8%; gap:4%; text-align:center; }
-.done-icon { font-size:clamp(48px,14vw,68px); animation:popIn 0.7s cubic-bezier(0.34,1.56,0.64,1); }
-@keyframes popIn { 0%{transform:scale(0);opacity:0} 100%{transform:scale(1);opacity:1} }
-.done-title { font-family:var(--garamond); font-size:clamp(42px,12vw,58px); color:var(--gold); font-weight:700; line-height:1; }
-.done-sub { font-size:14px; color:rgba(255,255,255,0.45); line-height:1.7; }
-.done-stats { display:flex; gap:3%; width:100%; }
-.stat-box { flex:1; padding:5% 4%; border:1px solid var(--glass-border); border-radius:14px; background:var(--glass); }
+/* ── DONE SCREEN (merged results + done) ── */
+#done-screen { background:radial-gradient(ellipse at 50% 0%,#1a1000 0%,#000 70%); padding:0; justify-content:flex-start; }
+.done-scroll { flex:1; overflow-y:auto; width:100%; padding:6% 8%; display:flex; flex-direction:column; align-items:center; }
+.done-eyebrow { font-size:11px; letter-spacing:5px; text-transform:uppercase; color:var(--gold); margin-bottom:8px; font-weight:500; align-self:flex-start; margin-top:6%; }
+.done-title { font-family:var(--garamond); font-size:clamp(42px,12vw,54px); color:var(--gold); font-weight:700; line-height:1; margin-bottom:5%; align-self:flex-start; }
+.done-stats { display:flex; gap:3%; width:100%; margin-bottom:6%; }
+.stat-box { flex:1; padding:5% 4%; border:1px solid var(--glass-border); border-radius:14px; background:var(--glass); text-align:center; }
 .stat-num { font-size:clamp(22px,7vw,30px); color:var(--gold); font-weight:700; }
 .stat-label { font-size:10px; color:rgba(255,255,255,0.35); text-transform:uppercase; letter-spacing:1px; margin-top:4px; }
+.done-ragas-label { font-size:10px; letter-spacing:3px; text-transform:uppercase; color:var(--gold); margin-bottom:10px; align-self:flex-start; font-weight:500; }
+.results-list { width:100%; list-style:none; padding:0; margin:0 0 5% 0; }
+.results-list li { display:flex; align-items:center; gap:12px; padding:10px 0; border-bottom:1px solid rgba(255,255,255,0.06); opacity:0; transform:translateY(8px); animation:resultFadeIn 0.35s ease forwards; }
+.results-list li .raga-num { font-size:12px; font-weight:700; color:var(--gold); min-width:24px; }
+.results-list li .raga-text { font-size:16px; font-weight:500; color:rgba(255,255,255,0.85); font-family:var(--garamond); letter-spacing:0.3px; }
+@keyframes resultFadeIn { to { opacity:1; transform:translateY(0); } }
+#surprise-reveal { width:100%; background:rgba(245,200,66,0.06); border:1px solid rgba(245,200,66,0.25); border-radius:14px; padding:5% 6%; margin-bottom:5%; text-align:center; }
+.surprise-theme-name { font-size:14px; font-weight:700; color:var(--gold); letter-spacing:0.5px; margin-bottom:6px; }
+.surprise-reveal-text { font-size:13px; color:rgba(255,255,255,0.6); line-height:1.5; font-style:italic; }
+.done-actions { width:100%; padding:0 8% 4%; display:flex; flex-direction:column; gap:10px; flex-shrink:0; }
 .download-btn { width:100%; padding:5%; background:var(--gold); color:#000; border:none; border-radius:14px; font-family:var(--font); font-size:18px; font-weight:700; cursor:pointer; box-shadow:0 8px 32px rgba(245,200,66,0.45); transition:transform 0.15s,opacity 0.2s; }
 .download-btn:hover:not(:disabled) { transform:translateY(-2px); }
 .download-btn:disabled { opacity:0.5; cursor:not-allowed; }
@@ -233,21 +231,7 @@ html, body {
 .conv-skip { background:transparent; border:1px solid rgba(255,255,255,0.2); color:rgba(255,255,255,0.45); padding:10px 24px; border-radius:10px; font-family:var(--font); font-size:13px; font-weight:500; cursor:pointer; margin-top:6px; transition:all 0.2s; }
 .conv-skip:hover { border-color:white; color:white; }
 
-/* ── RESULTS SCREEN ── */
-#results-screen { background:radial-gradient(ellipse at 50% 0%,#1a1000 0%,#000 70%); padding:6% 8%; gap:0; flex-direction:column; align-items:center; justify-content:flex-start; overflow-y:auto; }
-.results-eyebrow { font-size:11px; letter-spacing:5px; text-transform:uppercase; color:var(--gold); margin-top:8%; margin-bottom:8px; font-weight:500; }
-.results-title { font-family:var(--garamond); font-size:clamp(38px,10vw,52px); font-weight:700; color:white; margin-bottom:5%; text-align:center; line-height:1; }
-.results-list { width:100%; list-style:none; padding:0; margin:0 0 5% 0; }
-.results-list li { display:flex; align-items:center; gap:12px; padding:10px 14px; border-bottom:1px solid rgba(255,255,255,0.06); opacity:0; transform:translateY(12px); animation:resultFadeIn 0.4s ease forwards; }
-.results-list li .raga-num { font-size:13px; font-weight:700; color:var(--gold); min-width:28px; text-align:center; }
-.results-list li .raga-text { font-size:16px; font-weight:500; color:rgba(255,255,255,0.85); }
-@keyframes resultFadeIn { to { opacity:1; transform:translateY(0); } }
-.results-stats { display:flex; gap:3%; width:100%; margin-bottom:5%; }
-#surprise-reveal { width:100%; background:rgba(245,200,66,0.08); border:1px solid rgba(245,200,66,0.3); border-radius:14px; padding:5% 6%; margin-bottom:5%; text-align:center; }
-.surprise-theme-name { font-size:15px; font-weight:700; color:var(--gold); letter-spacing:0.5px; margin-bottom:6px; }
-.surprise-reveal-text { font-size:13px; color:rgba(255,255,255,0.7); line-height:1.5; font-style:italic; }
-#get-video-btn { width:100%; padding:5%; background:var(--gold); color:#000; border:none; border-radius:14px; font-family:var(--font); font-size:18px; font-weight:700; cursor:pointer; box-shadow:0 8px 32px rgba(245,200,66,0.45); transition:transform 0.15s; margin-top:auto; margin-bottom:4%; }
-#get-video-btn:hover { transform:translateY(-2px); }
+/* Results screen removed — merged into done-screen */
 </style>
 </head>
 <body>
@@ -289,19 +273,24 @@ html, body {
     <button class="perm-btn" onclick="startCamera()">Allow Camera</button>
   </div>
 
-  <!-- PREVIEW -->
+  <!-- PREVIEW — mirrors challenge layout so user sees exact framing -->
   <div id="preview-screen" class="screen">
-    <video id="preview-video" autoplay muted playsinline></video>
-    <div id="preview-overlay">
-      <div class="preview-hint">You're all set</div>
-      <div class="preview-title">Position yourself,<br>then hit record when ready.</div>
+    <div class="preview-top">
       <div class="preview-settings">
         <div class="preview-pill" id="prev-diff">Easy</div>
         <div class="preview-pill" id="prev-time">8s / raga</div>
         <div class="preview-pill" id="prev-count">10 ragas</div>
       </div>
-      <button id="start-rec-btn" onclick="beginCountdown()">&#9210; Start Recording</button>
-      <button class="preview-back" onclick="goBack()">&#8592; Change settings</button>
+    </div>
+    <div class="cam-middle">
+      <video id="preview-video" autoplay muted playsinline></video>
+      <div class="cam-overlay-top"></div>
+      <div class="cam-overlay-bottom"></div>
+    </div>
+    <div class="preview-bottom">
+      <div class="preview-hint">Position yourself · Hit record when ready</div>
+      <button id="start-rec-btn" onclick="beginCountdown()">⏺ Start Recording</button>
+      <button class="preview-back" onclick="goBack()">← Change settings</button>
     </div>
   </div>
 
@@ -362,25 +351,9 @@ html, body {
 
   </div>
 
-  <!-- RESULTS -->
-  <div id="results-screen" class="screen">
-    <div class="results-eyebrow">Challenge Complete</div>
-    <div class="results-title">Your Ragas</div>
-    <ol class="results-list" id="results-list"></ol>
-    <div class="results-stats">
-      <div class="stat-box"><div class="stat-num" id="res-stat-ragas">0</div><div class="stat-label">Ragas</div></div>
-      <div class="stat-box"><div class="stat-num" id="res-stat-time">0s</div><div class="stat-label">Duration</div></div>
-      <div class="stat-box"><div class="stat-num" id="res-stat-diff">—</div><div class="stat-label">Mode</div></div>
-    </div>
-    <div id="surprise-reveal" style="display:none">
-      <div class="surprise-theme-name" id="surprise-theme-name"></div>
-      <div class="surprise-reveal-text" id="surprise-reveal-text"></div>
-    </div>
-    <button id="get-video-btn" onclick="goToDoneScreen()">Get Your Video &rarr;</button>
-  </div>
-
-  <!-- DONE -->
+  <!-- DONE (merged results + done) -->
   <div id="done-screen" class="screen">
+    <!-- Processing overlay — shown while video converts -->
     <div id="conv-overlay">
       <div class="conv-emoji" id="conv-emoji">🎬</div>
       <div class="conv-title" id="conv-title">Processing…</div>
@@ -394,16 +367,27 @@ html, body {
       </div>
       <button class="conv-skip" id="conv-skip" onclick="skipToWebm()" style="display:none">Skip → Save WebM</button>
     </div>
-    <div class="done-icon">🎶</div>
-    <div class="done-title">Incredible!</div>
-    <div class="done-sub">Your Raga Challenge is complete.<br>Video is ready to share.</div>
-    <div class="done-stats">
-      <div class="stat-box"><div class="stat-num" id="stat-ragas">0</div><div class="stat-label">Ragas</div></div>
-      <div class="stat-box"><div class="stat-num" id="stat-time">0s</div><div class="stat-label">Duration</div></div>
-      <div class="stat-box"><div class="stat-num" id="stat-diff">—</div><div class="stat-label">Level</div></div>
+    <!-- Scrollable content -->
+    <div class="done-scroll">
+      <div class="done-eyebrow">Challenge Complete</div>
+      <div class="done-title">Incredible!</div>
+      <div class="done-stats">
+        <div class="stat-box"><div class="stat-num" id="stat-ragas">0</div><div class="stat-label">Ragas</div></div>
+        <div class="stat-box"><div class="stat-num" id="stat-time">0s</div><div class="stat-label">Duration</div></div>
+        <div class="stat-box"><div class="stat-num" id="stat-diff">—</div><div class="stat-label">Mode</div></div>
+      </div>
+      <div class="done-ragas-label">Your Ragas</div>
+      <ol class="results-list" id="results-list"></ol>
+      <div id="surprise-reveal" style="display:none">
+        <div class="surprise-theme-name" id="surprise-theme-name"></div>
+        <div class="surprise-reveal-text" id="surprise-reveal-text"></div>
+      </div>
     </div>
-    <button class="download-btn" id="dl-btn" onclick="shareOrDownload()" disabled>⏳ Preparing…</button>
-    <button class="restart-btn" onclick="restart()">New Challenge</button>
+    <!-- Sticky action buttons -->
+    <div class="done-actions">
+      <button class="download-btn" id="dl-btn" onclick="shareOrDownload()" disabled>⏳ Preparing…</button>
+      <button class="restart-btn" onclick="restart()">New Challenge</button>
+    </div>
   </div>
 
   <!-- 3-2-1 COUNTDOWN (overlays any screen) -->
@@ -475,9 +459,7 @@ function requestCamera(){ showScreen('perm-screen'); }
 async function startCamera(){
   const btn=document.querySelector('.perm-btn');
   btn.textContent='Starting…'; btn.disabled=true;
-  // Cap camera at 480p — we only need ~390px wide for recording; 1080p input wastes CPU on every drawImage call
-  const camConstraints={facingMode:'user',width:{ideal:480,max:960},height:{ideal:854,max:1280}};
-  const tries=[{video:camConstraints,audio:true},{video:camConstraints,audio:false},{video:{facingMode:'user'},audio:false},{video:true,audio:false}];
+  const tries=[{video:{facingMode:'user'},audio:true},{video:{facingMode:'user'},audio:false},{video:true,audio:false}];
   for(const c of tries){ try{ mediaStream=await navigator.mediaDevices.getUserMedia(c); break; }catch(e){ mediaStream=null; } }
   if(!mediaStream){ btn.textContent='Allow Camera'; btn.disabled=false; alert('Camera access failed.\n\nPlease:\n• Use Chrome or Safari\n• Allow camera permission\n• Ensure no other app uses camera'); return; }
 
@@ -765,7 +747,7 @@ function drawLoop(video,W,H,dpr=1){
     ctx.fillRect(0,0,W,H);
     const isGo=countdownText==='GO!';
     const cdFS=isGo?Math.round(W*0.22):Math.round(W*0.36);
-    ctx.font='700 '+cdFS+'px "Google Sans",sans-serif';
+    ctx.font='700 '+cdFS+'px "DM Sans",sans-serif';
     ctx.fillStyle=isGo?'#F5C842':'white';
     ctx.textAlign='center'; ctx.textBaseline='middle';
     ctx.shadowColor='rgba(245,200,66,0.6)'; ctx.shadowBlur=60;
@@ -790,11 +772,11 @@ function drawLoop(video,W,H,dpr=1){
     // "CHALLENGE COMPLETE" header
     const headAlpha=Math.min(1,elapsed/0.3);
     ctx.globalAlpha=headAlpha;
-    ctx.font='500 '+efs(0.03)+'px "Google Sans",sans-serif';
+    ctx.font='500 '+efs(0.03)+'px "DM Sans",sans-serif';
     ctx.fillStyle='#F5C842';
     ctx.textAlign='center';
     ctx.fillText('\u2726  CHALLENGE COMPLETE  \u2726',W/2,H*0.09);
-    ctx.font='700 '+efs(0.085)+'px "Google Sans",sans-serif';
+    ctx.font='700 '+efs(0.085)+'px "Cormorant Garamond",serif';
     ctx.fillStyle='white';
     ctx.shadowColor='rgba(245,200,66,0.3)'; ctx.shadowBlur=30;
     ctx.fillText('Your Ragas',W/2,H*0.16);
@@ -816,12 +798,12 @@ function drawLoop(video,W,H,dpr=1){
       ctx.globalAlpha=alpha;
       const y=listY+i*lineH;
       // Number
-      ctx.font='700 '+numFS+'px "Google Sans",sans-serif';
+      ctx.font='700 '+numFS+'px "DM Sans",sans-serif';
       ctx.fillStyle='#F5C842';
       ctx.textAlign='right';
       ctx.fillText((i+1)+'.',W*0.16,y);
       // Raga name
-      ctx.font='500 '+nameFS+'px "Google Sans",sans-serif';
+      ctx.font='600 '+nameFS+'px "Cormorant Garamond",serif';
       ctx.fillStyle='white';
       ctx.textAlign='left';
       ctx.fillText(raga,W*0.20,y);
@@ -833,7 +815,7 @@ function drawLoop(video,W,H,dpr=1){
     const statsAlpha=Math.min(1,Math.max(0,(elapsed-statsDelay)/0.3));
     if(statsAlpha>0){
       ctx.globalAlpha=statsAlpha;
-      ctx.font='500 '+efs(0.032)+'px "Google Sans",sans-serif';
+      ctx.font='500 '+efs(0.032)+'px "DM Sans",sans-serif';
       ctx.fillStyle='rgba(255,255,255,0.5)';
       ctx.textAlign='center';
       ctx.fillText(currentIdx+' Ragas  \u2022  '+challengeElapsed+'s  \u2022  '+difficulty[0].toUpperCase()+difficulty.slice(1),W/2,H*0.90);
@@ -848,19 +830,19 @@ function drawLoop(video,W,H,dpr=1){
   const fs=s=>Math.round(W*s);
 
   // ── Counter ──
-  ctx.font='500 '+fs(0.034)+'px "Google Sans",sans-serif';
+  ctx.font='500 '+fs(0.034)+'px "DM Sans",sans-serif';
   ctx.fillStyle='rgba(255,255,255,0.75)'; ctx.textAlign='left';
   ctx.fillText(document.getElementById('raga-counter').textContent, W*0.07, topY);
 
   // ── Difficulty ──
-  ctx.font='500 '+fs(0.028)+'px "Google Sans",sans-serif';
+  ctx.font='500 '+fs(0.028)+'px "DM Sans",sans-serif';
   ctx.fillStyle='#F5C842'; ctx.textAlign='right';
   ctx.fillText(difficulty.toUpperCase(), W*0.93, topY);
 
   // ── REC dot + label ──
   ctx.fillStyle='#E63946';
   ctx.beginPath(); ctx.arc(W/2-W*0.06,topY-4,W*0.018,0,Math.PI*2); ctx.fill();
-  ctx.font='500 '+fs(0.028)+'px "Google Sans",sans-serif';
+  ctx.font='500 '+fs(0.028)+'px "DM Sans",sans-serif';
   ctx.textAlign='center';
   ctx.fillText('REC',W/2+W*0.028,topY);
 
@@ -871,8 +853,8 @@ function drawLoop(video,W,H,dpr=1){
     const inner=document.getElementById('slot-inner');
     const ty=slotOffset;
     const wH=192*dpr, wY=BOT_Y+(BOT_H-192*dpr)/2, IH=64*dpr;
-    const fsize=fs(0.082);
-    ctx.font='700 '+fsize+'px "Google Sans",sans-serif';
+    const fsize=fs(0.085);
+    ctx.font='600 '+fsize+'px "Cormorant Garamond",serif';
     ctx.textAlign='center';
     inner.querySelectorAll('.slot-item').forEach((el,i)=>{
       const iy=wY+i*IH+ty*dpr, cy2=iy+IH/2;
@@ -892,7 +874,7 @@ function drawLoop(video,W,H,dpr=1){
     // Fades — use cached gradients
     ctx.fillStyle=cachedGrads.slotTop; ctx.fillRect(0,wY,W,wH*0.38);
     ctx.fillStyle=cachedGrads.slotBot; ctx.fillRect(0,wY+wH*0.62,W,wH*0.38);
-    ctx.font='400 '+fs(0.027)+'px "Google Sans",sans-serif';
+    ctx.font='400 '+fs(0.027)+'px "DM Sans",sans-serif';
     ctx.fillStyle='rgba(255,255,255,0.4)'; ctx.textAlign='center';
     ctx.fillText('PICKING YOUR RAGA…',W/2,wY+wH+28*dpr);
   } else {
@@ -901,10 +883,10 @@ function drawLoop(video,W,H,dpr=1){
     if(rd.classList.contains('visible')){
       const name=document.getElementById('raga-name').textContent;
       if(name&&name!=='—'){
-        ctx.font='500 '+fs(0.028)+'px "Google Sans",sans-serif';
+        ctx.font='500 '+fs(0.028)+'px "DM Sans",sans-serif';
         ctx.fillStyle='#F5C842'; ctx.textAlign='center';
         ctx.fillText('NOW SING',W/2,BOT_Y+BOT_H*0.28);
-        ctx.font='700 '+fs(0.065)+'px "Google Sans",sans-serif';
+        ctx.font='600 '+fs(0.068)+'px "Cormorant Garamond",serif';
         ctx.fillStyle='white'; ctx.textAlign='center';
         ctx.shadowColor='rgba(245,200,66,0.45)'; ctx.shadowBlur=40;
         ctx.fillText(name,W/2,BOT_Y+BOT_H*0.52);
@@ -925,7 +907,7 @@ function drawLoop(video,W,H,dpr=1){
     ctx.lineCap='butt';
   }
   if(secondsLeft>0){
-    ctx.font='700 '+Math.round(rR*0.92)+'px "Google Sans",sans-serif';
+    ctx.font='700 '+Math.round(rR*0.92)+'px "DM Sans",sans-serif';
     ctx.fillStyle='white'; ctx.textAlign='center';
     ctx.fillText(String(secondsLeft),rCX,rCY+rR*0.35);
   }
@@ -962,20 +944,23 @@ function endChallenge(){
 }
 
 function showResultsScreen(){
-  document.getElementById('res-stat-ragas').textContent=currentIdx;
-  document.getElementById('res-stat-time').textContent=challengeElapsed+'s';
-  document.getElementById('res-stat-diff').textContent=modeLabel();
+  // Populate stats
+  document.getElementById('stat-ragas').textContent=currentIdx;
+  document.getElementById('stat-time').textContent=challengeElapsed+'s';
+  document.getElementById('stat-diff').textContent=modeLabel();
+  // Populate raga list
   const list=document.getElementById('results-list');
   list.innerHTML='';
   const presented=ragaList.slice(0,currentIdx);
   presented.forEach((raga,i)=>{
     const li=document.createElement('li');
     li.style.animationDelay=(i*0.08)+'s';
-    const rn=document.createElement('span'); rn.className='raga-num'; rn.textContent=i+1;
+    const rn=document.createElement('span'); rn.className='raga-num'; rn.textContent=(i+1)+'.';
     const rt=document.createElement('span'); rt.className='raga-text'; rt.textContent=raga;
     li.append(rn,rt);
     list.appendChild(li);
   });
+  // Surprise reveal
   const revealEl=document.getElementById('surprise-reveal');
   if(difficulty==='surpriseMe' && activeTheme){
     document.getElementById('surprise-theme-name').textContent=activeTheme.name;
@@ -984,14 +969,8 @@ function showResultsScreen(){
   } else {
     revealEl.style.display='none';
   }
-  showScreen('results-screen');
-}
-
-function goToDoneScreen(){
-  document.getElementById('stat-ragas').textContent=currentIdx;
-  document.getElementById('stat-time').textContent=challengeElapsed+'s';
-  document.getElementById('stat-diff').textContent=modeLabel();
   showScreen('done-screen');
+  // Show processing overlay or enable download if already ready
   if(mp4Blob){
     enableDownloadButton();
   } else if(uploadFailed){

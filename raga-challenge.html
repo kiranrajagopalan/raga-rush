@@ -208,7 +208,6 @@ html, body {
 .download-btn:hover:not(:disabled) { transform:translateY(-2px); }
 .download-btn:disabled { opacity:0.5; cursor:not-allowed; }
 .download-btn.processing { opacity:0.75; cursor:default; }
-.download-btn.processing:hover { transform:none; }
 .btn-progress { position:absolute; bottom:0; left:0; height:3px; background:rgba(0,0,0,0.25); border-radius:0 0 14px 14px; transition:width 0.5s ease; width:0%; pointer-events:none; }
 .dl-skip-link { display:none; text-align:center; font-size:12px; color:rgba(255,255,255,0.3); cursor:pointer; padding:2px 0 4px; font-family:var(--font); transition:color 0.2s; }
 .dl-skip-link:hover { color:rgba(255,255,255,0.6); }
@@ -248,7 +247,7 @@ html, body {
         <button class="opt-btn selected" data-key="ragaCount" data-val="10" onclick="selectOpt(this,'count-group')">10</button>
       </div>
     </div>
-    <button class="start-btn" onclick="requestCamera()">Begin Challenge →</button>
+    <button class="start-btn" onclick="startCamera()">Begin Challenge →</button>
   </div>
 
   <!-- PREVIEW — mirrors challenge layout so user sees exact framing -->
@@ -419,8 +418,6 @@ function selectOpt(btn, groupId) {
   if(k==='timePerRaga') timePerRaga=parseInt(v);
   if(k==='ragaCount') ragaCount=parseInt(v);
 }
-
-function requestCamera(){ startCamera(); }
 
 async function startCamera(){
   const btn=document.querySelector('#setup-screen > .start-btn');
@@ -811,7 +808,7 @@ function drawLoop(video,W,H,dpr=1){
   const fs=s=>Math.round(W*s);
 
   // ── REC indicator dot (pulsing, top-left before counter) ──
-  const recDotVisible=Math.floor(Date.now()/700)%2===0;
+  const recDotVisible=Math.floor(now/700)%2===0;
   if(recDotVisible){
     ctx.fillStyle='#E63946';
     ctx.beginPath(); ctx.arc(W*0.055,topY-3,W*0.013,0,Math.PI*2); ctx.fill();

@@ -907,7 +907,7 @@ function drawLoop(video,W,H,dpr=1){
     const name=document.getElementById('raga-name').textContent;
     if(name&&name!=='—'){
         // Compute slide-up transition progress
-        const wH2=160, wY2=BOT_Y+(BOT_H-160)/2, IH2=Math.round(wH2/3);
+        const wH2=160*dpr, wY2=BOT_Y+(BOT_H-160*dpr)/2, IH2=Math.round(wH2/3);
         const slotNameY=wY2+IH2*1.5+fs(0.085)*0.36; // where winning slot item was
         const finalNameY=BOT_Y+BOT_H*0.28;
         let nameY=finalNameY, nameAlpha=1;

@@ -124,7 +124,7 @@ html, body {
 #camera-screen { background:#000; flex-direction:column; align-items:stretch; justify-content:flex-start; }
 .cam-top { flex:0 0 15%; display:flex; align-items:center; justify-content:space-between; padding:0 7%; background:#000; z-index:10; }
 .cam-middle { flex:0 0 55%; position:relative; overflow:hidden; }
-.cam-bottom { flex:0 0 30%; position:relative; display:flex; flex-direction:column; align-items:center; justify-content:space-around; padding:6px 7% 10px; background:#000; }
+.cam-bottom { flex:0 0 30%; position:relative; display:flex; flex-direction:column; align-items:center; justify-content:space-around; padding:6px 7% 10px; background:#000; overflow:hidden; }
 .cam-bottom-row { display:flex; align-items:center; gap:5%; width:100%; }
 #end-btn { flex:1; }
 #video-bg { position:absolute; inset:0; width:100%; height:100%; object-fit:cover; transform:scaleX(-1); }
@@ -654,7 +654,9 @@ function startRecording(){
   g4.addColorStop(0,'rgba(0,0,0,0)'); g4.addColorStop(1,'rgba(0,0,0,0.95)');
   const g5=recCtx.createRadialGradient(W/2,0,0,W/2,0,W*0.8);
   g5.addColorStop(0,'rgba(26,16,0,0.8)'); g5.addColorStop(1,'rgba(0,0,0,0)');
-  cachedGrads={topFade:g1,botFade:g2,slotTop:g3,slotBot:g4,endBg:g5};
+  const g6=recCtx.createRadialGradient(W/2,TOP_H+MID_H*0.5,MID_H*0.12,W/2,TOP_H+MID_H*0.5,W*0.76);
+  g6.addColorStop(0,'rgba(0,0,0,0)'); g6.addColorStop(1,'rgba(0,0,0,0.52)');
+  cachedGrads={topFade:g1,botFade:g2,slotTop:g3,slotBot:g4,endBg:g5,vignette:g6};
   const cs=recCanvas.captureStream(24);
   mediaStream.getAudioTracks().forEach(t=>cs.addTrack(t));
   const mimes=['video/mp4;codecs=h264,aac','video/mp4','video/webm;codecs=vp9,opus','video/webm;codecs=vp8,opus','video/webm'];
@@ -703,6 +705,7 @@ function drawLoop(video,W,H,dpr=1){
   // ── Gradient overlays (constrained to camera section) — use cached ──
   ctx.fillStyle=cachedGrads.topFade; ctx.fillRect(0,TOP_H,W,MID_H*0.35);
   ctx.fillStyle=cachedGrads.botFade; ctx.fillRect(0,BOT_Y-MID_H*0.25,W,MID_H*0.25);
+  ctx.fillStyle=cachedGrads.vignette; ctx.fillRect(0,TOP_H,W,MID_H);
 
   // ── Gold separator line (top bar / camera boundary) ──
   ctx.strokeStyle='rgba(245,200,66,0.2)'; ctx.lineWidth=1;
@@ -736,26 +739,48 @@ function drawLoop(video,W,H,dpr=1){
     ctx.fillStyle=cachedGrads.endBg;
     ctx.fillRect(0,0,W,H);
 
-    // "CHALLENGE COMPLETE" header
+    // ── Brand + top separator ──
     const headAlpha=Math.min(1,elapsed/0.3);
     ctx.globalAlpha=headAlpha;
-    ctx.font='500 '+efs(0.03)+'px "DM Sans",sans-serif';
-    ctx.fillStyle='#F5C842';
+    ctx.font='500 '+efs(0.026)+'px "DM Sans",sans-serif';
+    ctx.fillStyle='rgba(245,200,66,0.80)';
     ctx.textAlign='center';
-    ctx.fillText('\u2726  CHALLENGE COMPLETE  \u2726',W/2,H*0.09);
-    ctx.font='700 '+efs(0.085)+'px "Cormorant Garamond",serif';
-    ctx.fillStyle='white';
-    ctx.shadowColor='rgba(245,200,66,0.3)'; ctx.shadowBlur=30;
-    ctx.fillText('Your Ragas',W/2,H*0.16);
-    ctx.shadowBlur=0;
+    ctx.fillText('\u2726  RAGA CHALLENGE  \u2726',W/2,H*0.07);
+    ctx.strokeStyle='rgba(245,200,66,0.25)'; ctx.lineWidth=1;
+    ctx.beginPath(); ctx.moveTo(W*0.10,H*0.095); ctx.lineTo(W*0.90,H*0.095); ctx.stroke();
     ctx.globalAlpha=1;
 
-    // Raga list with staggered reveal
-    const maxListH=H*0.58;
-    const lineH=Math.min(H*0.055, maxListH/Math.max(presented.length,1));
-    const nameFS=Math.min(efs(0.05), Math.round(lineH*0.75));
-    const numFS=Math.min(efs(0.04), Math.round(lineH*0.65));
-    const listY=H*0.23;
+    // ── Hero number ──
+    const heroAlpha=Math.min(1,Math.max(0,(elapsed-0.1)/0.35));
+    if(heroAlpha>0){
+      ctx.globalAlpha=heroAlpha;
+      ctx.font='700 '+Math.round(W*0.25)+'px "Cormorant Garamond",serif';
+      ctx.fillStyle='white';
+      ctx.shadowColor='rgba(245,200,66,0.55)'; ctx.shadowBlur=70;
+      ctx.textAlign='center';
+      ctx.fillText(String(currentIdx),W/2,H*0.22);
+      ctx.shadowBlur=0;
+      ctx.font='600 '+efs(0.036)+'px "DM Sans",sans-serif';
+      ctx.fillStyle='#F5C842';
+      ctx.fillText(currentIdx===1?'RAGA':'RAGAS',W/2,H*0.28);
+      ctx.globalAlpha=1;
+    }
+
+    // ── List separator ──
+    const sepAlpha=Math.min(1,Math.max(0,(elapsed-0.2)/0.3));
+    if(sepAlpha>0){
+      ctx.globalAlpha=sepAlpha;
+      ctx.strokeStyle='rgba(245,200,66,0.25)'; ctx.lineWidth=1;
+      ctx.beginPath(); ctx.moveTo(W*0.10,H*0.310); ctx.lineTo(W*0.90,H*0.310); ctx.stroke();
+      ctx.globalAlpha=1;
+    }
+
+    // ── Raga list with staggered reveal ──
+    const listY=H*0.34;
+    const maxListH=H*0.54;
+    const lineH=Math.min(H*0.056, maxListH/Math.max(presented.length,1));
+    const nameFS=Math.min(efs(0.050), Math.round(lineH*0.76));
+    const numFS=Math.min(efs(0.040), Math.round(lineH*0.66));
     const stagger=Math.min(0.15, 2.0/Math.max(presented.length,1));
 
     presented.forEach((raga,i)=>{
@@ -764,12 +789,10 @@ function drawLoop(video,W,H,dpr=1){
       if(alpha<=0) return;
       ctx.globalAlpha=alpha;
       const y=listY+i*lineH;
-      // Number
       ctx.font='700 '+numFS+'px "DM Sans",sans-serif';
       ctx.fillStyle='#F5C842';
       ctx.textAlign='right';
       ctx.fillText((i+1)+'.',W*0.16,y);
-      // Raga name
       ctx.font='600 '+nameFS+'px "Cormorant Garamond",serif';
       ctx.fillStyle='white';
       ctx.textAlign='left';
@@ -777,26 +800,21 @@ function drawLoop(video,W,H,dpr=1){
     });
     ctx.globalAlpha=1;
 
-    // Stats row at bottom
+    // ── Footer: separator + stats + attribution ──
     const statsDelay=0.3+presented.length*stagger+0.3;
     const statsAlpha=Math.min(1,Math.max(0,(elapsed-statsDelay)/0.3));
     if(statsAlpha>0){
       ctx.globalAlpha=statsAlpha;
-      ctx.font='500 '+efs(0.032)+'px "DM Sans",sans-serif';
-      ctx.fillStyle='rgba(255,255,255,0.5)';
+      ctx.strokeStyle='rgba(255,255,255,0.10)'; ctx.lineWidth=1;
+      ctx.beginPath(); ctx.moveTo(W*0.10,H*0.888); ctx.lineTo(W*0.90,H*0.888); ctx.stroke();
+      ctx.font='500 '+efs(0.030)+'px "DM Sans",sans-serif';
+      ctx.fillStyle='rgba(255,255,255,0.45)';
       ctx.textAlign='center';
-      ctx.fillText(currentIdx+' Ragas  \u2022  '+challengeElapsed+'s  \u2022  '+difficulty[0].toUpperCase()+difficulty.slice(1),W/2,H*0.90);
-      ctx.globalAlpha=1;
-    }
-
-    // ── Brand attribution at bottom of end card ──
-    const brandAlpha=Math.min(1,Math.max(0,(elapsed-statsDelay)/0.3));
-    if(brandAlpha>0){
-      ctx.globalAlpha=brandAlpha*0.4;
-      ctx.font='500 '+efs(0.025)+'px "DM Sans",sans-serif';
+      ctx.fillText(challengeElapsed+'s  \u2022  '+difficulty[0].toUpperCase()+difficulty.slice(1),W/2,H*0.928);
+      ctx.globalAlpha=statsAlpha*0.35;
+      ctx.font='500 '+efs(0.024)+'px "DM Sans",sans-serif';
       ctx.fillStyle='#F5C842';
-      ctx.textAlign='center';
-      ctx.fillText('\u2726 RAGA CHALLENGE',W/2,H*0.96);
+      ctx.fillText('\u2726 RAGA CHALLENGE',W/2,H*0.969);
       ctx.globalAlpha=1;
     }
 
@@ -815,28 +833,36 @@ function drawLoop(video,W,H,dpr=1){
   }
 
   // ── Counter ──
-  ctx.font='500 '+fs(0.034)+'px "DM Sans",sans-serif';
-  ctx.fillStyle='rgba(255,255,255,0.75)'; ctx.textAlign='left';
+  ctx.font='600 '+fs(0.040)+'px "DM Sans",sans-serif';
+  ctx.fillStyle='rgba(255,255,255,0.92)'; ctx.textAlign='left';
   ctx.fillText(document.getElementById('raga-counter').textContent, W*0.10, topY);
 
   // ── Brand name (center) ──
-  ctx.font='500 '+fs(0.022)+'px "DM Sans",sans-serif';
-  ctx.fillStyle='rgba(245,200,66,0.5)';
+  ctx.font='500 '+fs(0.026)+'px "DM Sans",sans-serif';
+  ctx.fillStyle='rgba(245,200,66,0.82)';
   ctx.textAlign='center';
   ctx.fillText('\u2726 RAGA CHALLENGE', W/2, topY);
 
   // ── Difficulty ──
-  ctx.font='500 '+fs(0.028)+'px "DM Sans",sans-serif';
+  ctx.font='600 '+fs(0.032)+'px "DM Sans",sans-serif';
   ctx.fillStyle='#F5C842'; ctx.textAlign='right';
   ctx.fillText(difficulty.toUpperCase(), W*0.93, topY);
 
   // ── Slot machine (when active) ──
   const slotWrap=document.getElementById('slot-wrap');
   if(slotWrap.classList.contains('active')){
+    ctx.save();
+    ctx.beginPath(); ctx.rect(0,BOT_Y,W,BOT_H); ctx.clip(); // prevent bleed into camera
     ctx.fillStyle='rgba(0,0,0,0.8)'; ctx.fillRect(0,BOT_Y,W,BOT_H);
     const inner=document.getElementById('slot-inner');
     const ty=slotOffset;
     const wH=192*dpr, wY=BOT_Y+(BOT_H-192*dpr)/2, IH=64*dpr;
+    // Slot window pill outline
+    ctx.strokeStyle='rgba(245,200,66,0.18)'; ctx.lineWidth=1;
+    ctx.beginPath();
+    if(ctx.roundRect) ctx.roundRect(W*0.06,wY-6,W*0.88,wH+12,10);
+    else ctx.rect(W*0.06,wY-6,W*0.88,wH+12);
+    ctx.stroke();
     const fsize=fs(0.085);
     ctx.font='600 '+fsize+'px "Cormorant Garamond",serif';
     ctx.textAlign='center';
@@ -861,19 +887,27 @@ function drawLoop(video,W,H,dpr=1){
     ctx.font='400 '+fs(0.027)+'px "DM Sans",sans-serif';
     ctx.fillStyle='rgba(255,255,255,0.4)'; ctx.textAlign='center';
     ctx.fillText('PICKING YOUR RAGA…',W/2,wY+wH+28*dpr);
+    ctx.restore();
   } else {
     // ── Raga name ──
     const rd=document.getElementById('raga-display');
     if(rd.classList.contains('visible')){
       const name=document.getElementById('raga-name').textContent;
       if(name&&name!=='—'){
-        ctx.font='500 '+fs(0.028)+'px "DM Sans",sans-serif';
-        ctx.fillStyle='#F5C842'; ctx.textAlign='center';
-        ctx.fillText('NOW SING',W/2,BOT_Y+BOT_H*0.28);
-        ctx.font='600 '+fs(0.068)+'px "Cormorant Garamond",serif';
+        // "NOW SING" pill badge
+        ctx.fillStyle='rgba(245,200,66,0.12)';
+        ctx.beginPath();
+        if(ctx.roundRect) ctx.roundRect(W*0.30,BOT_Y+BOT_H*0.08,W*0.40,BOT_H*0.22,W*0.04);
+        else ctx.rect(W*0.30,BOT_Y+BOT_H*0.08,W*0.40,BOT_H*0.22);
+        ctx.fill();
+        ctx.font='600 '+fs(0.028)+'px "DM Sans",sans-serif';
+        ctx.fillStyle='rgba(245,200,66,0.90)'; ctx.textAlign='center';
+        ctx.fillText('NOW SING',W/2,BOT_Y+BOT_H*0.27);
+        // Raga name — bigger + stronger glow
+        ctx.font='600 '+fs(0.078)+'px "Cormorant Garamond",serif';
         ctx.fillStyle='white'; ctx.textAlign='center';
-        ctx.shadowColor='rgba(245,200,66,0.45)'; ctx.shadowBlur=40;
-        ctx.fillText(name,W/2,BOT_Y+BOT_H*0.52);
+        ctx.shadowColor='rgba(245,200,66,0.65)'; ctx.shadowBlur=55;
+        ctx.fillText(name,W/2,BOT_Y+BOT_H*0.55);
         ctx.shadowBlur=0;
       }
     }
@@ -895,6 +929,15 @@ function drawLoop(video,W,H,dpr=1){
     ctx.fillStyle='white'; ctx.textAlign='center';
     ctx.fillText(String(secondsLeft),rCX,rCY+rR*0.35);
   }
+
+  // ── Raga count badge (right side, mirrors ring for balance) ──
+  const bX=W*0.78, bY=rCY;
+  ctx.font='500 '+fs(0.020)+'px "DM Sans",sans-serif';
+  ctx.fillStyle='rgba(245,200,66,0.55)'; ctx.textAlign='center';
+  ctx.fillText('RAGA',bX,bY-rR*0.30);
+  ctx.font='700 '+Math.round(rR*0.88)+'px "DM Sans",sans-serif';
+  ctx.fillStyle='rgba(255,255,255,0.72)'; ctx.textAlign='center';
+  ctx.fillText(String(currentIdx),bX,bY+rR*0.34);
 
   requestAnimationFrame(()=>drawLoop(video,W,H,dpr));
 }

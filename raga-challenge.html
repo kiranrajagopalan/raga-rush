@@ -399,6 +399,7 @@ let countdownActive=false, countdownText='';
 let challengeElapsed=0, mp4Blob=null, uploadFailed=false, nativeMp4=false;
 let endCardActive=false, endCardStart=0;
 let slotOffset=0, cachedGrads={}, lastDrawTime=0;
+let slotWasActive=false, slotEndedAt=0;
 const DRAW_INTERVAL=1000/24; // target 24fps draw rate
 
 window.addEventListener('beforeunload',()=>{ if(mediaStream) mediaStream.getTracks().forEach(t=>t.stop()); });
@@ -665,6 +666,7 @@ function startRecording(){
   mediaRecorder=new MediaRecorder(cs,{mimeType:mime,videoBitsPerSecond:2500000});
   mediaRecorder.ondataavailable=e=>{ if(e.data.size>0) chunks.push(e.data); };
   isRecording=true; drawRunning=true; lastDrawTime=0;
+  slotWasActive=false; slotEndedAt=0;
   mediaRecorder.start(100); startTime=Date.now();
   document.fonts.ready.then(()=>drawLoop(video,CW,CH,dpr));
 }
@@ -825,6 +827,13 @@ function drawLoop(video,W,H,dpr=1){
   const topY=TOP_H*0.68;   // vertically centred in the 15% top strip
   const fs=s=>Math.round(W*s);
 
+  // ── Track slot-machine state (for raga-name entry transition) ──
+  const slotWrap=document.getElementById('slot-wrap');
+  const slotActive=slotWrap.classList.contains('active');
+  if(slotActive){ slotEndedAt=0; }
+  else if(slotWasActive){ slotEndedAt=now; }
+  slotWasActive=slotActive;
+
   // ── REC indicator dot (pulsing, top-left before counter) ──
   const recDotVisible=Math.floor(now/700)%2===0;
   if(recDotVisible){
@@ -854,8 +863,7 @@ function drawLoop(video,W,H,dpr=1){
   ctx.fillText(difficulty.toUpperCase(), W*0.93, topY);
 
   // ── Slot machine (when active) ──
-  const slotWrap=document.getElementById('slot-wrap');
-  if(slotWrap.classList.contains('active')){
+  if(slotActive){
     ctx.save();
     ctx.beginPath(); ctx.rect(0,BOT_Y,W,BOT_H); ctx.clip(); // prevent bleed into camera
     ctx.fillStyle='rgba(0,0,0,0.8)'; ctx.fillRect(0,BOT_Y,W,BOT_H);
@@ -894,28 +902,41 @@ function drawLoop(video,W,H,dpr=1){
     ctx.fillText('PICKING YOUR RAGA…',W/2,BOT_Y+BOT_H*0.915);
     ctx.restore();
   } else {
-    // ── Raga name ──
+    // ── Raga name (slides up from slot-window centre on entry) ──
     const rd=document.getElementById('raga-display');
     if(rd.classList.contains('visible')){
       const name=document.getElementById('raga-name').textContent;
       if(name&&name!=='—'){
-        // "NOW SING" plain gold label
+        // Compute slide-up transition progress
+        const wH2=160, wY2=BOT_Y+(BOT_H-160)/2, IH2=Math.round(wH2/3);
+        const slotNameY=wY2+IH2*1.5+fs(0.085)*0.36; // where winning slot item was
+        const finalNameY=BOT_Y+BOT_H*0.28;
+        let nameY=finalNameY, nameAlpha=1;
+        if(slotEndedAt>0){
+          const tElapsed=now-slotEndedAt;
+          const p=Math.min(1,tElapsed/350);
+          const eased=1-Math.pow(1-p,3); // ease-out cubic
+          nameY=slotNameY+(finalNameY-slotNameY)*eased;
+          nameAlpha=eased;
+        }
+        // "NOW SING" — delayed fade-in (starts at 150ms into the transition)
+        const nowSingAlpha=slotEndedAt>0?Math.min(1,Math.max(0,(now-slotEndedAt-150)/200)):1;
         ctx.font='600 '+fs(0.026)+'px "DM Sans",sans-serif';
-        ctx.fillStyle='rgba(245,200,66,0.75)'; ctx.textAlign='center';
-        ctx.fillText('NOW SING',W/2,BOT_Y+BOT_H*0.23);
-        // Raga name — bigger + stronger glow
+        ctx.fillStyle='rgba(245,200,66,'+(0.75*nowSingAlpha)+')'; ctx.textAlign='center';
+        ctx.fillText('NOW SING',W/2,BOT_Y+BOT_H*0.11);
+        // Raga name — slides up + fades in from slot centre
         ctx.font='600 '+fs(0.078)+'px "Cormorant Garamond",serif';
-        ctx.fillStyle='white'; ctx.textAlign='center';
-        ctx.shadowColor='rgba(245,200,66,0.65)'; ctx.shadowBlur=55;
-        ctx.fillText(name,W/2,BOT_Y+BOT_H*0.55);
+        ctx.fillStyle='rgba(255,255,255,'+nameAlpha+')'; ctx.textAlign='center';
+        ctx.shadowColor='rgba(245,200,66,'+(0.65*nameAlpha)+')'; ctx.shadowBlur=55;
+        ctx.fillText(name,W/2,nameY);
         ctx.shadowBlur=0;
       }
     }
   }
 
-  // ── Countdown ring + raga count — hidden during slot animation ──
-  if(!slotWrap.classList.contains('active')){
-    const rCX=W*0.22, rCY=BOT_Y+BOT_H*0.71, rR=W*0.11;
+  // ── Countdown ring (centred) — hidden during slot animation ──
+  if(!slotActive){
+    const rCX=W/2, rCY=BOT_Y+BOT_H*0.71, rR=W*0.11;
     const frac=Math.max(0,secondsLeft/timePerRaga);
     // Ring background
     ctx.beginPath(); ctx.arc(rCX,rCY,rR,0,Math.PI*2);
@@ -933,13 +954,6 @@ function drawLoop(video,W,H,dpr=1){
       ctx.fillStyle='white'; ctx.textAlign='center';
       ctx.fillText(String(secondsLeft),rCX,rCY+rR*0.35);
     }
-    // ── Raga count badge (right) — matching circle treatment ──
-    const bX=W*0.78, bY=rCY;
-    ctx.beginPath(); ctx.arc(bX,bY,rR,0,Math.PI*2);
-    ctx.strokeStyle='rgba(255,255,255,0.12)'; ctx.lineWidth=4*dpr; ctx.stroke();
-    ctx.font='700 '+Math.round(rR*0.92)+'px "DM Sans",sans-serif';
-    ctx.fillStyle='rgba(255,255,255,0.70)'; ctx.textAlign='center';
-    ctx.fillText(String(currentIdx),bX,bY+rR*0.35);
   }
 
   requestAnimationFrame(()=>drawLoop(video,W,H,dpr));

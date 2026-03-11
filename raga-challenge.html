@@ -903,10 +903,9 @@ function drawLoop(video,W,H,dpr=1){
     ctx.restore();
   } else {
     // ── Raga name (slides up from slot-window centre on entry) ──
-    const rd=document.getElementById('raga-display');
-    if(rd.classList.contains('visible')){
-      const name=document.getElementById('raga-name').textContent;
-      if(name&&name!=='—'){
+    // Don't gate on raga-display.visible — name is in DOM as soon as slot picks winner
+    const name=document.getElementById('raga-name').textContent;
+    if(name&&name!=='—'){
         // Compute slide-up transition progress
         const wH2=160, wY2=BOT_Y+(BOT_H-160)/2, IH2=Math.round(wH2/3);
         const slotNameY=wY2+IH2*1.5+fs(0.085)*0.36; // where winning slot item was
@@ -930,7 +929,6 @@ function drawLoop(video,W,H,dpr=1){
         ctx.shadowColor='rgba(245,200,66,'+(0.65*nameAlpha)+')'; ctx.shadowBlur=55;
         ctx.fillText(name,W/2,nameY);
         ctx.shadowBlur=0;
-      }
     }
   }
 

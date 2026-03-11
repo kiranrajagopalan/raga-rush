@@ -66,6 +66,7 @@ Offscreen canvas at `W×dpr` × `H×dpr` (dpr capped at 2×, 8 Mbps). `drawLoop(
 | `challengeElapsed` | Total recording time for stats display |
 | `currentIdx` / `ragaList` | Challenge progress tracking |
 | `secondsLeft` / `cdInterval` | Per-raga countdown timer |
+| `slotWasActive` / `slotEndedAt` | Edge-detection for slot→raga transition; `slotEndedAt` is a `performance.now()` timestamp, reset to 0 while slot is active |
 | `_cdDeleteToken` | Module-scoped (not on `window`) — Cloudinary delete token received after upload |
 
 ## Security Hardening (Applied)

@@ -5,6 +5,7 @@
 <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0">
 <title>Raga Challenge</title>
 <link href="https://fonts.googleapis.com/css2?family=Cormorant+Garamond:ital,wght@0,600;0,700;1,600&family=DM+Sans:opsz,wght@9..40,400;9..40,500;9..40,600;9..40,700&display=swap" rel="stylesheet">
+<script src="https://unpkg.com/@phosphor-icons/web@2.1.1"></script>
 <style>
 *, *::before, *::after { box-sizing: border-box; margin: 0; padding: 0; }
 :root {
@@ -13,6 +14,10 @@
   --font: 'DM Sans', sans-serif;
   --garamond: 'Cormorant Garamond', serif;
 }
+/* Phosphor icon sizing & alignment */
+.ph,[class^="ph-"],[class*=" ph-"]{ vertical-align:-0.12em; font-size:1.05em; }
+@keyframes spin-icon{ to{ transform:rotate(360deg); } }
+.spin-icon{ display:inline-block; animation:spin-icon 0.9s linear infinite; }
 html, body {
   width:100%; height:100%; background:#0d0d0d;
   display:flex; align-items:center; justify-content:center;
@@ -285,7 +290,7 @@ html, body {
       <div class="option-group" id="diff-group">
         <button class="opt-btn selected" data-key="difficulty" data-val="easy" onclick="selectOpt(this,'diff-group')">Easy</button>
         <button class="opt-btn" data-key="difficulty" data-val="notSoEasy" onclick="selectOpt(this,'diff-group')">Not So Easy</button>
-        <button class="opt-btn" data-key="difficulty" data-val="surpriseMe" onclick="selectOpt(this,'diff-group')">✦ Surprise Me</button>
+        <button class="opt-btn" data-key="difficulty" data-val="surpriseMe" onclick="selectOpt(this,'diff-group')"><i class="ph ph-sparkle"></i> Surprise Me</button>
       </div>
       <div class="section-label">Seconds per Raga</div>
       <div class="option-group" id="time-group">
@@ -299,7 +304,7 @@ html, body {
         <button class="opt-btn selected" data-key="ragaCount" data-val="10" onclick="selectOpt(this,'count-group')">10</button>
       </div>
     </div>
-    <button class="start-btn" onclick="startCamera()">Begin Challenge →</button>
+    <button class="start-btn" onclick="startCamera()">Begin Challenge <i class="ph-bold ph-arrow-right"></i></button>
   </div>
 
   <!-- PREVIEW — mirrors challenge layout so user sees exact framing -->
@@ -318,8 +323,8 @@ html, body {
     </div>
     <div class="preview-bottom">
       <div class="preview-hint">Position yourself · Hit record when ready</div>
-      <button id="start-rec-btn" onclick="beginCountdown()">⏺ Start Recording</button>
-      <button class="preview-back" onclick="goBack()">← Change settings</button>
+      <button id="start-rec-btn" onclick="beginCountdown()"><i class="ph-fill ph-record"></i> Start Recording</button>
+      <button class="preview-back" onclick="goBack()"><i class="ph ph-caret-left"></i> Change settings</button>
     </div>
   </div>
 
@@ -399,11 +404,11 @@ html, body {
     </div>
     <!-- Sticky action buttons -->
     <div class="done-actions">
-      <button class="download-btn" id="dl-btn" onclick="shareOrDownload()" disabled>⏳ Preparing…</button>
+      <button class="download-btn" id="dl-btn" onclick="shareOrDownload()" disabled><i class="ph-bold ph-circle-notch spin-icon"></i> Preparing…</button>
       <span class="dl-skip-link" id="dl-skip" onclick="skipToWebm()">Skip — Save WebM instead</span>
       <div class="done-secondary-row">
-        <button class="invite-btn" onclick="inviteFriend()">🔗 Invite</button>
-        <button class="restart-btn" onclick="restart()">↺ New Challenge</button>
+        <button class="invite-btn" onclick="inviteFriend()"><i class="ph ph-link-simple"></i> Invite</button>
+        <button class="restart-btn" onclick="restart()"><i class="ph ph-arrow-counter-clockwise"></i> New Challenge</button>
       </div>
       <div id="feedback-strip">
         <div class="fb-ambient">
@@ -503,7 +508,7 @@ async function startCamera(){
   btn.textContent='Starting camera…'; btn.disabled=true;
   const tries=[{video:{facingMode:'user'},audio:true},{video:{facingMode:'user'},audio:false},{video:true,audio:false}];
   for(const c of tries){ try{ mediaStream=await navigator.mediaDevices.getUserMedia(c); break; }catch(e){ mediaStream=null; } }
-  if(!mediaStream){ btn.textContent='Begin Challenge →'; btn.disabled=false; alert('Camera access failed.\n\nPlease:\n• Use Chrome or Safari\n• Allow camera permission\n• Ensure no other app uses camera'); return; }
+  if(!mediaStream){ btn.innerHTML='Begin Challenge <i class="ph-bold ph-arrow-right"></i>'; btn.disabled=false; alert('Camera access failed.\n\nPlease:\n• Use Chrome or Safari\n• Allow camera permission\n• Ensure no other app uses camera'); return; }
 
   // Feed same stream into both preview-video and video-bg
   const previewVideo=document.getElementById('preview-video');
@@ -521,7 +526,7 @@ async function startCamera(){
   document.getElementById('prev-count').textContent=ragaCount+' ragas';
 
   showScreen('preview-screen');
-  btn.textContent='Begin Challenge →'; btn.disabled=false;
+  btn.innerHTML='Begin Challenge <i class="ph-bold ph-arrow-right"></i>'; btn.disabled=false;
 }
 
 function goBack(){
@@ -1118,11 +1123,11 @@ function showResultsScreen(){
     enableDownloadButton();
   } else if(uploadFailed){
     const btn=document.getElementById('dl-btn');
-    btn.textContent='⬇ Save WebM';
+    btn.innerHTML='<i class="ph-bold ph-download-simple"></i> Save WebM';
     btn.disabled=false;
   } else {
     const btn=document.getElementById('dl-btn');
-    btn.innerHTML='<span id="dl-label">⏳ Preparing…</span><span class="btn-progress" id="btn-progress"></span>';
+    btn.innerHTML='<span id="dl-label"><i class="ph-bold ph-circle-notch spin-icon"></i> Preparing…</span><span class="btn-progress" id="btn-progress"></span>';
     btn.classList.add('processing');
     btn.disabled=true;
   }
@@ -1134,7 +1139,7 @@ function enableDownloadButton(){
   if(pb){ pb.style.width='100%'; }
   btn.classList.remove('processing');
   const canShare=navigator.canShare&&navigator.canShare({files:[new File([],'x.mp4',{type:'video/mp4'})]});
-  btn.textContent=canShare?'📲 Share Video':'⬇ Download MP4';
+  btn.innerHTML=canShare?'<i class="ph-bold ph-share-network"></i> Share Video':'<i class="ph-bold ph-download-simple"></i> Download MP4';
   btn.disabled=false;
 }
 
@@ -1145,7 +1150,7 @@ let mp4Url=null;
 function skipToWebm(){
   const btn=document.getElementById('dl-btn');
   btn.classList.remove('processing');
-  btn.textContent='⬇ Save WebM';
+  btn.innerHTML='<i class="ph-bold ph-download-simple"></i> Save WebM';
   btn.disabled=false;
   document.getElementById('dl-skip').style.display='none';
   mp4Url=null; mp4Blob=null;
@@ -1225,7 +1230,7 @@ async function processVideoInBackground(){
     if(isOnDone()){
       const btn=document.getElementById('dl-btn');
       btn.classList.remove('processing');
-      btn.textContent='⬇ Save WebM';
+      btn.innerHTML='<i class="ph-bold ph-download-simple"></i> Save WebM';
       btn.disabled=false;
     }
   }
@@ -1234,7 +1239,7 @@ async function processVideoInBackground(){
 function setConv(pct,msg){
   const lb=document.getElementById('dl-label');
   const pb=document.getElementById('btn-progress');
-  if(lb) lb.textContent='⏳ '+msg;
+  if(lb) lb.innerHTML='<i class="ph-bold ph-circle-notch spin-icon"></i> '+msg;
   if(pb) pb.style.width=pct+'%';
 }
 
@@ -1359,7 +1364,7 @@ async function inviteFriend(){
       // Brief "Copied!" toast
       const btn=document.querySelector('.invite-btn');
       const orig=btn.textContent;
-      btn.textContent='✓ Copied!';
+      btn.innerHTML='<i class="ph ph-check"></i> Copied!';
       setTimeout(()=>{ btn.textContent=orig; }, 2000);
     }catch(e){}
   }
@@ -1380,7 +1385,7 @@ function restart(){
   if(strip) strip.innerHTML=`<div class="fb-ambient"><span class="fb-ambient-label">How was it?</span><div class="fb-emoji-row"><button onclick="fbReact('love')" aria-label="Loved it">❤️</button><button onclick="fbReact('ok')" aria-label="It's ok">😐</button><button onclick="fbReact('nope')" aria-label="Not yet">😕</button></div></div>`;
   const dlBtn=document.getElementById('dl-btn');
   dlBtn.classList.remove('processing');
-  dlBtn.textContent='⏳ Preparing…';
+  dlBtn.innerHTML='<i class="ph-bold ph-circle-notch spin-icon"></i> Preparing…';
   dlBtn.disabled=true;
   document.getElementById('dl-skip').style.display='none';
   showScreen('setup-screen');

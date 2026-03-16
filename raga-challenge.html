@@ -194,13 +194,13 @@ html, body {
 /* ── DONE SCREEN (merged results + done) ── */
 #done-screen { background:radial-gradient(ellipse at 50% 0%,#1a1000 0%,#000 70%); padding:0; justify-content:flex-start; }
 .done-scroll { flex:1; overflow-y:auto; width:100%; padding:6% 8%; display:flex; flex-direction:column; align-items:center; }
-.done-eyebrow { font-size:11px; letter-spacing:5px; text-transform:uppercase; color:var(--gold); margin-bottom:8px; font-weight:500; align-self:flex-start; margin-top:6%; }
-.done-title { font-family:var(--garamond); font-size:clamp(42px,12vw,54px); color:var(--gold); font-weight:700; line-height:1; margin-bottom:5%; align-self:flex-start; }
+.done-eyebrow { font-size:11px; letter-spacing:5px; text-transform:uppercase; color:var(--gold); margin-bottom:8px; font-weight:500; text-align:center; margin-top:6%; }
+.done-title { font-family:var(--garamond); font-size:clamp(42px,12vw,54px); color:var(--gold); font-weight:700; line-height:1; margin-bottom:5%; text-align:center; width:100%; }
 .done-stats { display:flex; gap:3%; width:100%; margin-bottom:6%; }
 .stat-box { flex:1; padding:5% 4%; border:1px solid var(--glass-border); border-radius:14px; background:var(--glass); text-align:center; }
 .stat-num { font-size:clamp(22px,7vw,30px); color:var(--gold); font-weight:700; }
 .stat-label { font-size:10px; color:rgba(255,255,255,0.35); text-transform:uppercase; letter-spacing:1px; margin-top:4px; }
-.done-ragas-label { font-size:10px; letter-spacing:3px; text-transform:uppercase; color:var(--gold); margin-bottom:10px; align-self:flex-start; font-weight:500; }
+.done-ragas-label { font-size:10px; letter-spacing:3px; text-transform:uppercase; color:var(--gold); margin-bottom:10px; text-align:center; font-weight:500; width:100%; }
 .results-list { width:100%; list-style:none; padding:0; margin:0 0 5% 0; }
 .results-list li { display:flex; align-items:center; gap:12px; padding:10px 0; border-bottom:1px solid rgba(255,255,255,0.06); opacity:0; transform:translateY(8px); animation:resultFadeIn 0.35s ease forwards; }
 .results-list li .raga-num { font-size:12px; font-weight:700; color:var(--gold); min-width:24px; }
@@ -221,6 +221,10 @@ html, body {
 .invite-btn:hover { background:rgba(245,200,66,0.1); }
 .restart-btn { background:transparent; border:none; padding:3% 0; color:rgba(255,255,255,0.3); font-family:var(--font); font-size:13px; font-weight:400; cursor:pointer; transition:color 0.2s; letter-spacing:0.5px; width:100%; text-align:center; }
 .restart-btn:hover { color:rgba(255,255,255,0.6); }
+.done-secondary-row { display:flex; gap:8px; width:100%; }
+.done-secondary-row .invite-btn { flex:1; padding:4% 3%; font-size:14px; width:auto; }
+.done-secondary-row .restart-btn { flex:1; padding:4% 3%; font-size:14px; letter-spacing:0.3px; border:1px solid rgba(255,255,255,0.18); border-radius:14px; color:rgba(255,255,255,0.55); width:auto; }
+.done-secondary-row .restart-btn:hover { color:rgba(255,255,255,0.85); background:rgba(255,255,255,0.05); }
 
 /* Results screen removed — merged into done-screen */
 
@@ -228,11 +232,11 @@ html, body {
 #feedback-strip { width:100%; overflow:hidden; }
 /* Ambient (default — always visible, slim) */
 .fb-ambient { display:flex; align-items:center; justify-content:space-between;
-  padding:10px 0 4px; border-top:1px solid rgba(255,255,255,0.08); margin-top:2px; }
+  padding:16px 0 10px; border-top:1px solid rgba(255,255,255,0.08); margin-top:2px; }
 .fb-ambient-label { font-size:11px; letter-spacing:2px; text-transform:uppercase;
   color:rgba(255,255,255,0.28); font-family:var(--font); }
 .fb-emoji-row { display:flex; gap:14px; }
-.fb-emoji-row button { background:none; border:none; font-size:20px; cursor:pointer;
+.fb-emoji-row button { background:none; border:none; font-size:22px; cursor:pointer;
   padding:4px 2px; opacity:0.5; transition:opacity 0.15s, transform 0.15s; }
 .fb-emoji-row button:active { opacity:1; transform:scale(1.25); }
 /* Prominent card (post-share) */
@@ -381,10 +385,9 @@ html, body {
     <!-- Scrollable content -->
     <div class="done-scroll">
       <div class="done-eyebrow">Challenge Complete</div>
-      <div class="done-title">Incredible!</div>
+      <div class="done-title"></div>
       <div class="done-stats">
         <div class="stat-box"><div class="stat-num" id="stat-ragas">0</div><div class="stat-label">Ragas</div></div>
-        <div class="stat-box"><div class="stat-num" id="stat-time">0s</div><div class="stat-label">Duration</div></div>
         <div class="stat-box"><div class="stat-num" id="stat-diff">—</div><div class="stat-label">Mode</div></div>
       </div>
       <div class="done-ragas-label">Your Ragas</div>
@@ -398,8 +401,10 @@ html, body {
     <div class="done-actions">
       <button class="download-btn" id="dl-btn" onclick="shareOrDownload()" disabled>⏳ Preparing…</button>
       <span class="dl-skip-link" id="dl-skip" onclick="skipToWebm()">Skip — Save WebM instead</span>
-      <button class="invite-btn" onclick="inviteFriend()">🔗 Invite a Friend</button>
-      <button class="restart-btn" onclick="restart()">New Challenge</button>
+      <div class="done-secondary-row">
+        <button class="invite-btn" onclick="inviteFriend()">🔗 Invite</button>
+        <button class="restart-btn" onclick="restart()">↺ New Challenge</button>
+      </div>
       <div id="feedback-strip">
         <div class="fb-ambient">
           <span class="fb-ambient-label">How was it?</span>
@@ -460,6 +465,20 @@ let slotOffset=0, cachedGrads={}, lastDrawTime=0;
 let slotSpinning=false, ragaRevealAt=0, ragaRevealName='';
 let fbReaction=null, fbShared=false;
 const DRAW_INTERVAL=1000/24; // target 24fps draw rate
+const DONE_TITLES=[
+  'Todi-ally crushed it!',
+  'Kapi-tal performance!',
+  'Sri-ously impressive!',
+  'Rāga-nificent!',
+  'Mohanam-azing!',
+  'Nattai-led it!',
+  'Māyā-gnificent!',
+  'Varāli good!',
+  'Swara-perfect!',
+  "You've got shruti!",
+  'Sur-prisingly good!',
+  'Hamsa-down, you won!',
+];
 
 window.addEventListener('beforeunload',()=>{ if(mediaStream) mediaStream.getTracks().forEach(t=>t.stop()); });
 
@@ -1068,8 +1087,10 @@ function endChallenge(){
 function showResultsScreen(){
   // Populate stats
   document.getElementById('stat-ragas').textContent=currentIdx;
-  document.getElementById('stat-time').textContent=challengeElapsed+'s';
   document.getElementById('stat-diff').textContent=modeLabel();
+  // Random Carnatic pun title
+  document.querySelector('.done-title').textContent=
+    DONE_TITLES[Math.floor(Math.random()*DONE_TITLES.length)];
   // Populate raga list
   const list=document.getElementById('results-list');
   list.innerHTML='';

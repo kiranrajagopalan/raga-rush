@@ -1336,14 +1336,18 @@ function fbSubmit(){
   clearTimeout(window._fbChipTimer);
   const chips=[...document.querySelectorAll('.fb-chip.selected')].map(c=>c.dataset.v);
   try{
-    const body=new URLSearchParams({
-      reaction: fbReaction||'',
-      features: chips.join(','),
-      raga_count: currentIdx,
-      difficulty: difficulty
+    fetch('https://formsubmit.co/ajax/kiranrajgopal@gmail.com',{
+      method:'POST',
+      headers:{'Content-Type':'application/json','Accept':'application/json'},
+      body:JSON.stringify({
+        reaction: fbReaction||'',
+        features: chips.join(','),
+        raga_count: currentIdx,
+        difficulty: difficulty,
+        _subject: 'Raga Challenge Feedback',
+        _captcha: 'false'
+      })
     });
-    fetch('TALLY_FORM_ENDPOINT',{method:'POST',body,
-      headers:{'Content-Type':'application/x-www-form-urlencoded'}});
   }catch(e){}
   const strip=document.getElementById('feedback-strip');
   if(!strip) return;

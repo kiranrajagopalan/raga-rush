@@ -399,7 +399,7 @@ let countdownActive=false, countdownText='';
 let challengeElapsed=0, mp4Blob=null, uploadFailed=false, nativeMp4=false;
 let endCardActive=false, endCardStart=0;
 let slotOffset=0, cachedGrads={}, lastDrawTime=0;
-let slotWasActive=false, slotEndedAt=0;
+let slotWasActive=false, slotEndedAt=0, slotSettledAt=0, prevSlotOffset=null, slotSettledName='';
 const DRAW_INTERVAL=1000/24; // target 24fps draw rate
 
 window.addEventListener('beforeunload',()=>{ if(mediaStream) mediaStream.getTracks().forEach(t=>t.stop()); });
@@ -666,7 +666,7 @@ function startRecording(){
   mediaRecorder=new MediaRecorder(cs,{mimeType:mime,videoBitsPerSecond:2500000});
   mediaRecorder.ondataavailable=e=>{ if(e.data.size>0) chunks.push(e.data); };
   isRecording=true; drawRunning=true; lastDrawTime=0;
-  slotWasActive=false; slotEndedAt=0;
+  slotWasActive=false; slotEndedAt=0; slotSettledAt=0; prevSlotOffset=null; slotSettledName='';
   mediaRecorder.start(100); startTime=Date.now();
   document.fonts.ready.then(()=>drawLoop(video,CW,CH,dpr));
 }
@@ -827,12 +827,23 @@ function drawLoop(video,W,H,dpr=1){
   const topY=TOP_H*0.68;   // vertically centred in the 15% top strip
   const fs=s=>Math.round(W*s);
 
-  // ── Track slot-machine state (for raga-name entry transition) ──
+  // ── Track slot-machine state ──
+  // slotSettledAt: set when slotOffset stops changing (scroll done, 700ms pause still running)
+  // slotEndedAt:   set when .active is finally removed (fallback, shouldn't be needed)
   const slotWrap=document.getElementById('slot-wrap');
   const slotActive=slotWrap.classList.contains('active');
-  if(slotActive){ slotEndedAt=0; }
-  else if(slotWasActive){ slotEndedAt=now; }
+  if(slotActive){
+    if(prevSlotOffset!==null && slotOffset===prevSlotOffset){
+      if(!slotSettledAt){
+        slotSettledAt=now;
+        const ci=document.getElementById('slot-inner').querySelector('.slot-item.center');
+        slotSettledName=ci?ci.textContent:'';
+      }
+    } else { slotSettledAt=0; slotSettledName=''; }
+    slotEndedAt=0;
+  } else if(slotWasActive){ slotEndedAt=now; slotSettledAt=0; }
   slotWasActive=slotActive;
+  prevSlotOffset=slotActive?slotOffset:null;
 
   // ── REC indicator dot (pulsing, top-left before counter) ──
   const recDotVisible=Math.floor(now/700)%2===0;
@@ -862,15 +873,16 @@ function drawLoop(video,W,H,dpr=1){
   ctx.fillStyle='#F5C842'; ctx.textAlign='right';
   ctx.fillText(difficulty.toUpperCase(), W*0.93, topY);
 
-  // ── Slot machine (when active) ──
-  if(slotActive){
+  // ── Slot machine / raga reveal ──
+  // showSlot: still spinning (not yet settled). Once settled, switch to raga name immediately.
+  const showSlot=slotActive&&!slotSettledAt;
+  if(showSlot){
     ctx.save();
-    ctx.beginPath(); ctx.rect(0,BOT_Y,W,BOT_H); ctx.clip(); // prevent bleed into camera
+    ctx.beginPath(); ctx.rect(0,BOT_Y,W,BOT_H); ctx.clip();
     ctx.fillStyle='rgba(0,0,0,0.8)'; ctx.fillRect(0,BOT_Y,W,BOT_H);
     const inner=document.getElementById('slot-inner');
     const ty=slotOffset;
     const wH=160*dpr, wY=BOT_Y+(BOT_H-160*dpr)/2, IH=Math.round(wH/3);
-    // Slot window pill outline
     ctx.strokeStyle='rgba(245,200,66,0.18)'; ctx.lineWidth=1;
     ctx.beginPath();
     if(ctx.roundRect) ctx.roundRect(W*0.06,wY-6,W*0.88,wH+12,10);
@@ -887,14 +899,12 @@ function drawLoop(video,W,H,dpr=1){
       ctx.fillText(el.textContent,W/2,cy2+fsize*0.36);
       ctx.shadowBlur=0;
     });
-    // Gold lines
     const l1=wY+wH*0.32, l2=wY+wH*0.68;
     ctx.strokeStyle='#F5C842'; ctx.lineWidth=2*dpr;
     ctx.shadowColor='#F5C842'; ctx.shadowBlur=14;
     ctx.beginPath(); ctx.moveTo(W*0.08,l1); ctx.lineTo(W*0.92,l1); ctx.stroke();
     ctx.beginPath(); ctx.moveTo(W*0.08,l2); ctx.lineTo(W*0.92,l2); ctx.stroke();
     ctx.shadowBlur=0;
-    // Fades — use cached gradients
     ctx.fillStyle=cachedGrads.slotTop; ctx.fillRect(0,wY,W,wH*0.38);
     ctx.fillStyle=cachedGrads.slotBot; ctx.fillRect(0,wY+wH*0.62,W,wH*0.38);
     ctx.font='400 '+fs(0.027)+'px "DM Sans",sans-serif';
@@ -902,37 +912,32 @@ function drawLoop(video,W,H,dpr=1){
     ctx.fillText('PICKING YOUR RAGA…',W/2,BOT_Y+BOT_H*0.915);
     ctx.restore();
   } else {
-    // ── Raga name (slides up from slot-window centre on entry) ──
-    // Don't gate on raga-display.visible — name is in DOM as soon as slot picks winner
-    const name=document.getElementById('raga-name').textContent;
+    // ── Raga name — triggered by scroll-stop (slotSettledAt) not by .active removal ──
+    const name=slotSettledName||document.getElementById('raga-name').textContent;
+    const transitionStart=slotSettledAt||slotEndedAt;
     if(name&&name!=='—'){
-        // Compute slide-up transition progress
-        const wH2=160*dpr, wY2=BOT_Y+(BOT_H-160*dpr)/2, IH2=Math.round(wH2/3);
-        const slotNameY=wY2+IH2*1.5+fs(0.085)*0.36; // where winning slot item was
-        const finalNameY=BOT_Y+BOT_H*0.28;
-        let nameY=finalNameY, nameAlpha=1;
-        if(slotEndedAt>0){
-          const tElapsed=now-slotEndedAt;
-          const p=Math.min(1,tElapsed/350);
-          const eased=1-Math.pow(1-p,3); // ease-out cubic
-          nameY=slotNameY+(finalNameY-slotNameY)*eased;
-        }
-        // "NOW SING" — delayed fade-in (starts at 150ms into the transition)
-        const nowSingAlpha=slotEndedAt>0?Math.min(1,Math.max(0,(now-slotEndedAt-150)/200)):1;
-        ctx.font='600 '+fs(0.026)+'px "DM Sans",sans-serif';
-        ctx.fillStyle='rgba(245,200,66,'+(0.75*nowSingAlpha)+')'; ctx.textAlign='center';
-        ctx.fillText('NOW SING',W/2,BOT_Y+BOT_H*0.11);
-        // Raga name — slides up + fades in from slot centre
-        ctx.font='600 '+fs(0.078)+'px "Cormorant Garamond",serif';
-        ctx.fillStyle='rgba(255,255,255,'+nameAlpha+')'; ctx.textAlign='center';
-        ctx.shadowColor='rgba(245,200,66,'+(0.65*nameAlpha)+')'; ctx.shadowBlur=55;
-        ctx.fillText(name,W/2,nameY);
-        ctx.shadowBlur=0;
+      const wH2=160, wY2=BOT_Y+(BOT_H-160)/2, IH2=Math.round(wH2/3);
+      const slotNameY=wY2+IH2*1.5+fs(0.085)*0.36;
+      const finalNameY=BOT_Y+BOT_H*0.28;
+      let nameY=finalNameY;
+      if(transitionStart>0){
+        const p=Math.min(1,(now-transitionStart)/350);
+        nameY=slotNameY+(finalNameY-slotNameY)*(1-Math.pow(1-p,3));
+      }
+      const nowSingAlpha=transitionStart>0?Math.min(1,Math.max(0,(now-transitionStart-150)/200)):1;
+      ctx.font='600 '+fs(0.026)+'px "DM Sans",sans-serif';
+      ctx.fillStyle='rgba(245,200,66,'+(0.75*nowSingAlpha)+')'; ctx.textAlign='center';
+      ctx.fillText('NOW SING',W/2,BOT_Y+BOT_H*0.11);
+      ctx.font='600 '+fs(0.078)+'px "Cormorant Garamond",serif';
+      ctx.fillStyle='white'; ctx.textAlign='center';
+      ctx.shadowColor='rgba(245,200,66,0.65)'; ctx.shadowBlur=55;
+      ctx.fillText(name,W/2,nameY);
+      ctx.shadowBlur=0;
     }
   }
 
-  // ── Countdown ring (centred) — hidden during slot animation ──
-  if(!slotActive){
+  // ── Countdown ring — hidden while slot is showing ──
+  if(!showSlot){
     const rCX=W/2, rCY=BOT_Y+BOT_H*0.71, rR=W*0.11;
     const frac=Math.max(0,secondsLeft/timePerRaga);
     // Ring background

@@ -137,24 +137,30 @@ html, body {
 .rec-dot { width:7px; height:7px; border-radius:50%; background:var(--red); animation:blink 1s infinite; }
 @keyframes blink { 0%,100%{opacity:1} 50%{opacity:0.1} }
 
-/* ── SLOT MACHINE ── */
+/* ── SLOT MACHINE — winner lands at TOP of window ── */
 #slot-wrap {
   position:absolute; inset:0; z-index:20;
-  background:rgba(0,0,0,0.65); backdrop-filter:blur(8px);
-  display:none; flex-direction:column; align-items:center; justify-content:center;
+  background:rgba(0,0,0,0.82); backdrop-filter:blur(8px);
+  display:flex; flex-direction:column; align-items:center; justify-content:center;
+  opacity:0; pointer-events:none; transition:none;
 }
-#slot-wrap.active { display:flex; }
-#slot-window { width:88%; height:192px; overflow:hidden; position:relative; display:flex; align-items:flex-start; justify-content:center; }
-#slot-window::before,#slot-window::after { content:''; position:absolute; left:0; right:0; height:36%; z-index:2; pointer-events:none; }
-#slot-window::before { top:0; background:linear-gradient(to bottom,rgba(0,0,0,0.95),transparent); }
-#slot-window::after  { bottom:0; background:linear-gradient(to top,rgba(0,0,0,0.95),transparent); }
-.sel-line { position:absolute; left:0; right:0; height:2px; background:var(--gold); z-index:3; box-shadow:0 0 16px var(--gold),0 0 40px rgba(245,200,66,0.4); }
-.sel-line.top { top:32%; }
-.sel-line.bot { bottom:32%; }
-#slot-inner { display:flex; flex-direction:column; align-items:center; will-change:transform; }
-.slot-item { font-family:var(--garamond); font-weight:600; font-size:clamp(20px,6vw,30px); height:64px; line-height:64px; text-align:center; white-space:nowrap; padding:0 20px; color:rgba(255,255,255,0.22); }
-.slot-item.center { color:white; text-shadow:0 0 30px rgba(245,200,66,0.7); }
-.slot-hint { margin-top:18px; font-size:11px; letter-spacing:3px; color:rgba(255,255,255,0.45); text-transform:uppercase; font-weight:400; }
+#slot-wrap.active   { opacity:1; pointer-events:auto; transition:none; }
+#slot-wrap.settling { opacity:0; pointer-events:none; transition:opacity 0.45s ease; }
+#slot-window { width:88%; height:160px; overflow:hidden; position:relative; }
+/* No top fade — winner row is at the very top */
+#slot-window::after { content:''; position:absolute; left:0; right:0; bottom:0; height:55%; z-index:2; pointer-events:none;
+  background:linear-gradient(to top,rgba(0,0,0,0.95) 0%,rgba(0,0,0,0.5) 55%,transparent 100%); }
+/* Single gold separator line — bottom edge of winner row */
+.sel-line { position:absolute; left:0; right:0; z-index:3; top:53px; height:1px;
+  background:linear-gradient(to right,transparent 0%,rgba(245,200,66,0.9) 10%,rgba(245,200,66,0.9) 90%,transparent 100%);
+  box-shadow:0 0 8px rgba(245,200,66,0.5),0 0 20px rgba(245,200,66,0.15); }
+/* Warm glow behind winner row */
+.winner-row { position:absolute; top:0; left:0; right:0; height:53px; z-index:1;
+  background:linear-gradient(to bottom,rgba(245,200,66,0.07) 0%,transparent 100%); pointer-events:none; }
+#slot-inner { display:flex; flex-direction:column; align-items:center; will-change:transform; position:relative; z-index:2; }
+.slot-item { font-family:var(--garamond); font-weight:600; font-size:33px; height:53px; line-height:53px; text-align:center; white-space:nowrap; padding:0 20px; color:rgba(255,255,255,0.20); transition:color 60ms linear,text-shadow 60ms linear; }
+.slot-item.center { color:white; text-shadow:0 0 22px rgba(245,200,66,0.9),0 0 55px rgba(245,200,66,0.3); }
+.slot-hint { margin-top:14px; font-size:10px; letter-spacing:3.5px; color:rgba(255,255,255,0.35); text-transform:uppercase; font-weight:400; }
 
 /* ── RAGA DISPLAY ── */
 #raga-display { display:flex; flex-direction:column; align-items:center; pointer-events:none; opacity:0; transition:opacity 0.4s; }
@@ -293,8 +299,8 @@ html, body {
       <!-- Slot machine: overlays cam-bottom only when active -->
       <div id="slot-wrap">
         <div id="slot-window">
-          <div class="sel-line top"></div>
-          <div class="sel-line bot"></div>
+          <div class="winner-row"></div>
+          <div class="sel-line"></div>
           <div id="slot-inner"></div>
         </div>
         <div class="slot-hint">Picking your Raga…</div>
@@ -399,7 +405,7 @@ let countdownActive=false, countdownText='';
 let challengeElapsed=0, mp4Blob=null, uploadFailed=false, nativeMp4=false;
 let endCardActive=false, endCardStart=0;
 let slotOffset=0, cachedGrads={}, lastDrawTime=0;
-let slotWasActive=false, prevSlotOffset=null, ragaRevealAt=0, ragaRevealName='';
+let slotSpinning=false, ragaRevealAt=0, ragaRevealName='';
 const DRAW_INTERVAL=1000/24; // target 24fps draw rate
 
 window.addEventListener('beforeunload',()=>{ if(mediaStream) mediaStream.getTracks().forEach(t=>t.stop()); });
@@ -529,6 +535,20 @@ function setupChallenge(){
   setTimeout(revealRaga,700);
 }
 
+// ── Event notifications: canvas reacts to slot state without DOM polling ──
+function notifyCanvasSlotStarted() {
+  slotSpinning=true; ragaRevealAt=0; ragaRevealName='';
+}
+function notifyCanvasSlotSettled(name) {
+  slotSpinning=false; ragaRevealName=name; ragaRevealAt=performance.now();
+  // DOM: reveal raga name immediately (before the 700ms .active removal)
+  const n=document.getElementById('raga-name');
+  n.textContent=name; n.classList.remove('reveal'); void n.offsetWidth; n.classList.add('reveal');
+  document.getElementById('raga-display').classList.add('visible');
+  // DOM: crossfade — slot fades out while raga display fades in
+  document.getElementById('slot-wrap').classList.add('settling');
+}
+
 function revealRaga(){
   if(currentIdx>=ragaList.length){ endChallenge(); return; }
   const raga=ragaList[currentIdx++];
@@ -538,39 +558,35 @@ function revealRaga(){
   clearInterval(cdInterval);
   document.getElementById('countdown-num').textContent='—';
   document.getElementById('ring-progress').style.strokeDashoffset=0;
-  runSlotMachine(raga,()=>{
-    const n=document.getElementById('raga-name');
-    n.textContent=raga; n.classList.remove('reveal'); void n.offsetWidth; n.classList.add('reveal');
-    document.getElementById('raga-display').classList.add('visible');
-    spawnParticles(); startCountdown();
-  });
+  // notifyCanvasSlotSettled handles raga name + display reveal; onDone just starts countdown
+  runSlotMachine(raga,()=>{ spawnParticles(); startCountdown(); });
 }
 
 function runSlotMachine(target, onDone){
+  notifyCanvasSlotStarted();
   const wrap=document.getElementById('slot-wrap');
   const inner=document.getElementById('slot-inner');
   const pool=RAGAS[difficulty]||RAGAS.easy;
   const items=[];
   for(let i=0;i<20;i++) items.push(pool[Math.floor(Math.random()*pool.length)]);
   items.push(target);
-  const ITEM_H=64;
+  const ITEM_H=53;  // matches canvas IH=Math.round(160/3)=53
   inner.innerHTML='';
   items.forEach(n=>{ const d=document.createElement('div'); d.className='slot-item'; d.textContent=n; inner.appendChild(d); });
+  // Reset: clear any settling from previous spin, show slot
+  wrap.classList.remove('settling');
   wrap.classList.add('active');
-  const totalDist=(items.length-1)*ITEM_H;  // 1280px
-  // startY offsets inner so item[0] is centered in the 192px window (96 - 32 = 64px)
-  const startY=192/2-ITEM_H/2;              // 64px
-  const finalY=startY-totalDist;            // 64 - 1280 = -1216px (item[last] centered)
+  // Winner (item[last]) lands at TOP of window (slotOffset = -(N-1)*ITEM_H)
+  const startY=160/2-ITEM_H/2;           // item[0] starts centered in 160px window ≈ 53.5px
+  const finalY=-(items.length-1)*ITEM_H; // winner at top → slotOffset = -(N-1)*53
+  const totalDist=startY-finalY;         // total scroll distance
   inner.style.transform='translateY('+startY+'px)';
-  // Time-based animation: guaranteed completion, cubic ease-out to zero velocity
-  // Fast phase: first 768px at 20px/frame (640ms)
-  // Decel phase: last 512px cubic ease-out (1280ms)
-  const decelDist=Math.min(totalDist,8*ITEM_H); // 512px
-  const spinDist=totalDist-decelDist;            // 768px
-  const MPF=1000/60;                             // ms per frame at 60fps
-  const SPIN_MS=spinDist/20*MPF;                 // 640ms
-  const DECEL_MS=3*decelDist/20*MPF;            // 1280ms — cubic initial speed matches fast phase
-  const TOTAL_MS=SPIN_MS+DECEL_MS;              // 1920ms
+  const decelDist=Math.min(totalDist,8*ITEM_H);
+  const spinDist=totalDist-decelDist;
+  const MPF=1000/60;
+  const SPIN_MS=spinDist/20*MPF;
+  const DECEL_MS=3*decelDist/20*MPF;
+  const TOTAL_MS=SPIN_MS+DECEL_MS;
   let t0=null;
   function tick(ts){
     if(!t0) t0=ts;
@@ -580,17 +596,19 @@ function runSlotMachine(target, onDone){
       pos=(el/SPIN_MS)*spinDist;
     } else {
       const p=(el-SPIN_MS)/DECEL_MS;
-      pos=spinDist+(1-Math.pow(1-p,3))*decelDist; // cubic ease-out
+      pos=spinDist+(1-Math.pow(1-p,3))*decelDist;
     }
     slotOffset=startY-pos;
     inner.style.transform='translateY('+slotOffset+'px)';
-    const ci=Math.min(items.length-1, Math.round(pos/ITEM_H));
+    // Highlight item at TOP of window: item[i].y=0 → i*ITEM_H+slotOffset=0 → i=-slotOffset/ITEM_H
+    const ci=Math.max(0,Math.min(items.length-1,Math.round(-slotOffset/ITEM_H)));
     inner.querySelectorAll('.slot-item').forEach((e,i)=>e.classList.toggle('center',i===ci));
     if(el>=TOTAL_MS){
       slotOffset=finalY;
       inner.style.transform='translateY('+finalY+'px)';
       inner.querySelectorAll('.slot-item').forEach((e,i)=>e.classList.toggle('center',i===items.length-1));
-      setTimeout(()=>{ wrap.classList.remove('active'); onDone(); },700);
+      notifyCanvasSlotSettled(target);  // canvas starts reveal + DOM crossfade immediately
+      setTimeout(()=>{ wrap.classList.remove('active','settling'); onDone(); },700);
       return;
     }
     requestAnimationFrame(tick);
@@ -666,7 +684,7 @@ function startRecording(){
   mediaRecorder=new MediaRecorder(cs,{mimeType:mime,videoBitsPerSecond:2500000});
   mediaRecorder.ondataavailable=e=>{ if(e.data.size>0) chunks.push(e.data); };
   isRecording=true; drawRunning=true; lastDrawTime=0;
-  slotWasActive=false; prevSlotOffset=null; ragaRevealAt=0; ragaRevealName='';
+  slotSpinning=false; ragaRevealAt=0; ragaRevealName='';
   mediaRecorder.start(100); startTime=Date.now();
   document.fonts.ready.then(()=>drawLoop(video,CW,CH,dpr));
 }
@@ -827,29 +845,9 @@ function drawLoop(video,W,H,dpr=1){
   const topY=TOP_H*0.68;   // vertically centred in the 15% top strip
   const fs=s=>Math.round(W*s);
 
-  // ── Slot state: detect scroll-stop to trigger raga reveal ──
-  // ragaRevealAt is set ONCE when slotOffset stops changing (scroll done).
-  // It is never reset mid-raga — only cleared when a new slot spin begins.
-  const slotWrap=document.getElementById('slot-wrap');
-  const slotActive=slotWrap.classList.contains('active');
-  if(!slotWasActive && slotActive){
-    // New spin starting — clear previous reveal state
-    prevSlotOffset=null; ragaRevealAt=0; ragaRevealName='';
-  }
-  if(slotActive && ragaRevealAt===0){
-    // Detect scroll-stop: same slotOffset on two consecutive canvas frames
-    if(prevSlotOffset!==null && slotOffset===prevSlotOffset){
-      ragaRevealAt=now;
-      const ci=document.getElementById('slot-inner').querySelector('.slot-item.center');
-      ragaRevealName=ci?ci.textContent:'';
-    }
-    prevSlotOffset=slotOffset;
-  } else if(!slotActive && ragaRevealAt===0){
-    // Fallback: .active removed before scroll-stop detected (shouldn't happen)
-    ragaRevealAt=now;
-    ragaRevealName=document.getElementById('raga-name').textContent;
-  }
-  slotWasActive=slotActive;
+  // ── Slot state: driven by event notifications, no DOM polling needed ──
+  // slotSpinning=true  → show slot machine
+  // slotSpinning=false → show raga reveal (ragaRevealAt/ragaRevealName set by notifyCanvasSlotSettled)
 
   // ── REC indicator dot (pulsing, top-left before counter) ──
   const recDotVisible=Math.floor(now/700)%2===0;
@@ -880,67 +878,87 @@ function drawLoop(video,W,H,dpr=1){
   ctx.fillText(difficulty.toUpperCase(), W*0.93, topY);
 
   // ── Bottom section: slot OR raga reveal ──
-  // showSlot=true while spinning. The moment scroll stops (ragaRevealAt set), showSlot=false
-  // and never goes back to true for this raga.
-  const showSlot = slotActive && ragaRevealAt===0;
+  const showSlot = slotSpinning;
 
   if(showSlot){
-    // ── Slot machine (spinning) ──
+    // ── Slot machine (winner at TOP of window) ──
     ctx.save();
-    ctx.beginPath(); ctx.rect(0,BOT_Y,W,BOT_H); ctx.clip();
-    ctx.fillStyle='rgba(0,0,0,0.8)'; ctx.fillRect(0,BOT_Y,W,BOT_H);
+    const wH=160, wY=BOT_Y+(BOT_H-160)/2, IH=53; // IH=53 matches DOM ITEM_H
+    ctx.fillStyle='rgba(0,0,0,0.82)'; ctx.fillRect(0,BOT_Y,W,BOT_H);
+    // Winner row warm glow
+    const winGrad=ctx.createLinearGradient(0,wY,0,wY+IH);
+    winGrad.addColorStop(0,'rgba(245,200,66,0.07)'); winGrad.addColorStop(1,'rgba(245,200,66,0.01)');
+    ctx.fillStyle=winGrad; ctx.fillRect(0,wY,W,IH);
+    // Clip items to slot window
+    ctx.save();
+    ctx.beginPath(); ctx.rect(0,wY,W,wH); ctx.clip();
     const inner=document.getElementById('slot-inner');
-    const wH=160, wY=BOT_Y+(BOT_H-160)/2, IH=Math.round(wH/3);
-    ctx.strokeStyle='rgba(245,200,66,0.18)'; ctx.lineWidth=1;
-    ctx.beginPath();
-    if(ctx.roundRect) ctx.roundRect(W*0.06,wY-6,W*0.88,wH+12,10);
-    else ctx.rect(W*0.06,wY-6,W*0.88,wH+12);
-    ctx.stroke();
     const fsize=fs(0.085);
     ctx.font='600 '+fsize+'px "Cormorant Garamond",serif';
     ctx.textAlign='center';
     inner.querySelectorAll('.slot-item').forEach((el,i)=>{
       const iy=wY+i*IH+slotOffset, cy2=iy+IH/2;
       if(cy2<wY-IH||cy2>wY+wH+IH) return;
-      ctx.fillStyle=el.classList.contains('center')?'white':'rgba(255,255,255,0.28)';
-      if(el.classList.contains('center')){ ctx.shadowColor='rgba(245,200,66,0.7)'; ctx.shadowBlur=20; }
-      ctx.fillText(el.textContent,W/2,cy2+fsize*0.36);
-      ctx.shadowBlur=0;
+      const isTop=el.classList.contains('center');
+      ctx.fillStyle=isTop?'white':'rgba(255,255,255,0.20)';
+      if(isTop){
+        ctx.shadowColor='rgba(245,200,66,0.9)'; ctx.shadowBlur=22;
+        ctx.fillText(el.textContent,W/2,cy2+fsize*0.36);
+        ctx.shadowColor='rgba(245,200,66,0.3)'; ctx.shadowBlur=55;
+        ctx.fillText(el.textContent,W/2,cy2+fsize*0.36);
+        ctx.shadowBlur=0;
+      } else {
+        ctx.fillText(el.textContent,W/2,cy2+fsize*0.36);
+      }
     });
-    const l1=wY+wH*0.32, l2=wY+wH*0.68;
-    ctx.strokeStyle='#F5C842'; ctx.lineWidth=2;
-    ctx.shadowColor='#F5C842'; ctx.shadowBlur=14;
-    ctx.beginPath(); ctx.moveTo(W*0.08,l1); ctx.lineTo(W*0.92,l1); ctx.stroke();
-    ctx.beginPath(); ctx.moveTo(W*0.08,l2); ctx.lineTo(W*0.92,l2); ctx.stroke();
+    ctx.restore(); // remove window clip
+    // Single separator line below winner row
+    const lineY=wY+IH;
+    const lg=ctx.createLinearGradient(W*0.04,0,W*0.96,0);
+    lg.addColorStop(0,'transparent'); lg.addColorStop(0.08,'rgba(245,200,66,0.85)');
+    lg.addColorStop(0.92,'rgba(245,200,66,0.85)'); lg.addColorStop(1,'transparent');
+    ctx.strokeStyle=lg; ctx.lineWidth=1.5;
+    ctx.shadowColor='rgba(245,200,66,0.45)'; ctx.shadowBlur=8;
+    ctx.beginPath(); ctx.moveTo(W*0.04,lineY); ctx.lineTo(W*0.96,lineY); ctx.stroke();
     ctx.shadowBlur=0;
-    ctx.fillStyle=cachedGrads.slotTop; ctx.fillRect(0,wY,W,wH*0.38);
+    // Bottom fade
     ctx.fillStyle=cachedGrads.slotBot; ctx.fillRect(0,wY+wH*0.62,W,wH*0.38);
-    ctx.font='400 '+fs(0.027)+'px "DM Sans",sans-serif';
-    ctx.fillStyle='rgba(255,255,255,0.4)'; ctx.textAlign='center';
-    ctx.fillText('PICKING YOUR RAGA…',W/2,BOT_Y+BOT_H*0.915);
+    // PICKING text — anchored below slot window
+    ctx.letterSpacing='3.5px';
+    ctx.font='400 10px "DM Sans",sans-serif';
+    ctx.fillStyle='rgba(255,255,255,0.35)'; ctx.textAlign='center';
+    ctx.fillText('PICKING YOUR RAGA\u2026',W/2,wY+wH+22);
+    ctx.letterSpacing='0px';
     ctx.restore();
 
   } else if(ragaRevealAt>0){
-    // ── Raga reveal: name at final position immediately, ring + NOW SING fade in after 150ms ──
+    // ── Raga reveal: name at winner-row Y immediately; NOW SING fades in after 120ms ──
     const name=ragaRevealName||document.getElementById('raga-name').textContent;
     if(name&&name!=='—'){
       const elapsed=now-ragaRevealAt;
-      const revealAlpha=Math.min(1,Math.max(0,(elapsed-150)/200)); // 150ms delay, 200ms fade
-      ctx.font='600 '+fs(0.026)+'px "DM Sans",sans-serif';
-      ctx.fillStyle='rgba(245,200,66,'+(0.75*revealAlpha)+')'; ctx.textAlign='center';
-      ctx.fillText('NOW SING',W/2,BOT_Y+BOT_H*0.11);
-      ctx.font='600 '+fs(0.078)+'px "Cormorant Garamond",serif';
+      const nowSingFade=Math.min(1,Math.max(0,(elapsed-120)/280));
+      const wH=160, wY=BOT_Y+(BOT_H-160)/2, IH=53;
+      const WINNER_CY=wY+IH/2; // exact centre of winner row
+      // NOW SING
+      ctx.letterSpacing='4px';
+      ctx.font='700 10px "DM Sans",sans-serif';
+      ctx.fillStyle='rgba(245,200,66,'+(0.85*nowSingFade)+')'; ctx.textAlign='center';
+      ctx.fillText('NOW SING',W/2,wY-5);
+      ctx.letterSpacing='0px';
+      // Raga name — full opacity immediately, at winner row centre
+      const nameFsize=fs(0.085);
+      ctx.font='600 '+nameFsize+'px "Cormorant Garamond",serif';
       ctx.fillStyle='white'; ctx.textAlign='center';
       ctx.shadowColor='rgba(245,200,66,0.65)'; ctx.shadowBlur=55;
-      ctx.fillText(name,W/2,BOT_Y+BOT_H*0.28);
+      ctx.fillText(name,W/2,WINNER_CY+nameFsize*0.36);
       ctx.shadowBlur=0;
     }
   }
 
-  // ── Countdown ring — appears with same 150ms delay as NOW SING ──
+  // ── Countdown ring — fades in 120ms after reveal ──
   if(!showSlot && ragaRevealAt>0){
     const elapsed=now-ragaRevealAt;
-    const ringAlpha=Math.min(1,Math.max(0,(elapsed-150)/200));
+    const ringAlpha=Math.min(1,Math.max(0,(elapsed-120)/280));
     if(ringAlpha>0){
       ctx.globalAlpha=ringAlpha;
       const rCX=W/2, rCY=BOT_Y+BOT_H*0.71, rR=W*0.11;

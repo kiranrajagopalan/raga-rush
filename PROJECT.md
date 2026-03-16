@@ -66,7 +66,8 @@ Offscreen canvas at `W×dpr` × `H×dpr` (dpr capped at 2×, 8 Mbps). `drawLoop(
 | `challengeElapsed` | Total recording time for stats display |
 | `currentIdx` / `ragaList` | Challenge progress tracking |
 | `secondsLeft` / `cdInterval` | Per-raga countdown timer |
-| `slotWasActive` / `slotEndedAt` | Edge-detection for slot→raga transition; `slotEndedAt` is a `performance.now()` timestamp, reset to 0 while slot is active |
+| `slotSpinning` | `true` while slot reel is animating; set by `notifyCanvasSlotStarted()` / `notifyCanvasSlotSettled()` |
+| `ragaRevealAt` / `ragaRevealName` | `performance.now()` timestamp + winner name set the instant the reel stops; drives canvas reveal animation |
 | `_cdDeleteToken` | Module-scoped (not on `window`) — Cloudinary delete token received after upload |
 
 ## Security Hardening (Applied)

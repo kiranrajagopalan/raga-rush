@@ -133,8 +133,8 @@ html, body {
 .cam-bottom-row { display:flex; align-items:center; gap:5%; width:100%; }
 #end-btn { flex:1; }
 #video-bg { position:absolute; inset:0; width:100%; height:100%; object-fit:cover; transform:scaleX(-1); }
-.cam-overlay-top { position:absolute; top:0; left:0; right:0; height:25%; background:linear-gradient(to bottom,rgba(0,0,0,0.8) 0%,transparent 100%); pointer-events:none; }
-.cam-overlay-bottom { position:absolute; bottom:0; left:0; right:0; height:35%; background:linear-gradient(to top,rgba(0,0,0,0.88) 0%,transparent 100%); pointer-events:none; }
+.cam-overlay-top { display:none; }
+.cam-overlay-bottom { display:none; }
 .raga-counter { font-size:13px; letter-spacing:1px; color:rgba(255,255,255,0.75); font-weight:500; }
 .difficulty-badge { font-size:10px; letter-spacing:2px; text-transform:uppercase; padding:4px 12px; border-radius:20px; border:1px solid var(--glass-border); background:var(--glass); backdrop-filter:blur(8px); color:var(--gold); font-weight:500; }
 #rec-badge { display:flex; align-items:center; gap:6px; font-size:11px; letter-spacing:2px; color:var(--red); opacity:0; transition:opacity 0.3s; font-weight:500; }
@@ -201,11 +201,11 @@ html, body {
 .done-scroll { flex:1; overflow-y:auto; width:100%; padding:6% 8% 12%; display:flex; flex-direction:column; align-items:center; }
 .done-eyebrow { font-size:11px; letter-spacing:5px; text-transform:uppercase; color:var(--gold); margin-bottom:8px; font-weight:500; text-align:center; margin-top:6%; }
 .done-title { font-family:var(--garamond); font-size:clamp(30px,9vw,50px); color:var(--gold); font-weight:700; line-height:1.05; margin-bottom:5%; text-align:center; width:100%; hyphens:none; overflow-wrap:break-word; }
-.done-stats { display:flex; gap:3%; width:100%; margin-bottom:6%; align-items:stretch; }
-.stat-box { flex:1; padding:5% 4%; border:1px solid var(--glass-border); border-radius:14px; background:var(--glass); text-align:center; display:flex; flex-direction:column; align-items:center; justify-content:center; }
-.stat-num { font-size:clamp(22px,7vw,30px); color:var(--gold); font-weight:700; line-height:1.15; }
-.stat-num.is-text { font-size:clamp(13px,3.8vw,17px); line-height:1.3; }
-.stat-label { font-size:10px; color:rgba(255,255,255,0.35); text-transform:uppercase; letter-spacing:1px; margin-top:5px; }
+.done-stats { display:flex; gap:2%; width:100%; margin-bottom:5%; align-items:stretch; }
+.stat-box { flex:1; padding:10px 8px; border:1px solid var(--glass-border); border-radius:10px; background:var(--glass); text-align:center; display:flex; flex-direction:column; align-items:center; justify-content:center; }
+.stat-num { font-size:clamp(15px,4.5vw,20px); color:var(--gold); font-weight:700; line-height:1.2; }
+.stat-num.is-text { font-size:clamp(10px,3vw,13px); line-height:1.3; }
+.stat-label { font-size:9px; color:rgba(255,255,255,0.35); text-transform:uppercase; letter-spacing:1px; margin-top:4px; }
 .done-ragas-label { font-size:10px; letter-spacing:3px; text-transform:uppercase; color:var(--gold); margin-bottom:10px; text-align:center; font-weight:500; width:100%; }
 .results-list { width:100%; list-style:none; padding:0; margin:0 0 5% 0; }
 .results-list li { display:flex; align-items:center; gap:12px; padding:10px 0; border-bottom:1px solid rgba(255,255,255,0.06); opacity:0; transform:translateY(8px); animation:resultFadeIn 0.35s ease forwards; }
@@ -258,23 +258,58 @@ html, body {
 .fb-card-react .lb { font-size:10px; letter-spacing:1px; color:rgba(255,255,255,0.38);
   font-family:var(--font); text-transform:uppercase; display:block; }
 .fb-card-react:active .em { transform:scale(1.25); }
-/* Chip grid */
-.fb-chips-label { font-size:12px; color:rgba(255,255,255,0.45); margin-bottom:14px;
-  font-family:var(--font); }
-.fb-chip-grid { display:grid; grid-template-columns:1fr 1fr; gap:8px; margin-bottom:16px; }
-.fb-chip { padding:10px 8px; border:1px solid rgba(245,200,66,0.32); border-radius:10px;
-  background:transparent; color:rgba(255,255,255,0.65); font-size:12px; font-family:var(--font);
-  cursor:pointer; text-align:center; transition:background 0.15s, border-color 0.15s, color 0.15s;
-  line-height:1.35; }
-.fb-chip.selected { background:rgba(245,200,66,0.15); border-color:var(--gold); color:var(--gold); }
-.fb-skip { font-size:12px; color:rgba(255,255,255,0.28); background:none; border:none;
-  cursor:pointer; font-family:var(--font); display:block; text-align:right;
-  width:100%; padding:2px 0; transition:color 0.2s; }
-.fb-skip:hover { color:rgba(255,255,255,0.55); }
 /* Thanks state */
 .fb-thanks { font-size:13px; color:rgba(255,255,255,0.38); text-align:center;
   padding:14px 0; opacity:1; transition:opacity 0.4s ease; font-family:var(--font); }
 .fb-thanks.fade { opacity:0; }
+
+/* ── FEEDBACK BOTTOM SHEET ── */
+#fb-sheet-backdrop {
+  display:none; position:fixed; inset:0; background:rgba(0,0,0,0.55);
+  z-index:200; backdrop-filter:blur(2px); -webkit-backdrop-filter:blur(2px); }
+#fb-sheet-backdrop.open { display:block; }
+#fb-sheet {
+  position:fixed; bottom:0; left:50%;
+  transform:translateX(-50%) translateY(100%);
+  width:100%; max-width:430px;
+  background:#111; border-radius:20px 20px 0 0;
+  padding:16px 24px 40px; z-index:201;
+  transition:transform 0.35s cubic-bezier(0.32,0.72,0,1);
+  display:flex; flex-direction:column; gap:20px; box-sizing:border-box; }
+#fb-sheet.open { transform:translateX(-50%) translateY(0); }
+.fb-sheet-handle {
+  width:36px; height:4px; border-radius:2px;
+  background:rgba(255,255,255,0.18); margin:0 auto; flex-shrink:0; }
+.fb-sheet-title {
+  font-family:var(--font); font-size:17px; font-weight:600;
+  color:rgba(255,255,255,0.9); margin:0; line-height:1.3; }
+.fb-chip-grid {
+  display:grid; grid-template-columns:1fr 1fr; gap:10px; }
+.fb-chip {
+  padding:14px 10px; border:1px solid rgba(245,200,66,0.28); border-radius:12px;
+  background:transparent; color:rgba(255,255,255,0.6); font-size:13px;
+  font-family:var(--font); cursor:pointer; text-align:center;
+  transition:background 0.15s, border-color 0.15s, color 0.15s; line-height:1.35; }
+.fb-chip.selected {
+  background:rgba(245,200,66,0.15); border-color:var(--gold); color:var(--gold); }
+#fb-text {
+  width:100%; background:rgba(255,255,255,0.05); border:1px solid rgba(255,255,255,0.1);
+  border-radius:12px; padding:14px; font-family:var(--font); font-size:14px;
+  color:rgba(255,255,255,0.75); resize:none; min-height:76px; box-sizing:border-box;
+  transition:border-color 0.15s; }
+#fb-text::placeholder { color:rgba(255,255,255,0.28); }
+#fb-text:focus { outline:none; border-color:rgba(245,200,66,0.4); }
+#fb-send-btn {
+  width:100%; padding:16px; background:var(--gold); color:#000;
+  border:none; border-radius:14px; font-family:var(--font);
+  font-size:16px; font-weight:700; cursor:pointer;
+  transition:opacity 0.15s, transform 0.15s; }
+#fb-send-btn:active { transform:scale(0.98); }
+.fb-sheet-skip {
+  font-size:12px; color:rgba(255,255,255,0.28); background:none; border:none;
+  cursor:pointer; font-family:var(--font); text-align:center; width:100%;
+  padding:0; transition:color 0.2s; }
+.fb-sheet-skip:hover { color:rgba(255,255,255,0.5); }
 </style>
 </head>
 <body>
@@ -424,6 +459,22 @@ html, body {
     </div>
   </div>
 
+  <!-- FEEDBACK BOTTOM SHEET -->
+  <div id="fb-sheet-backdrop" onclick="fbSheetClose()"></div>
+  <div id="fb-sheet">
+    <div class="fb-sheet-handle"></div>
+    <p class="fb-sheet-title">What would you love to see next?</p>
+    <div class="fb-chip-grid" id="fb-chip-grid">
+      <button class="fb-chip" data-v="multiplayer" onclick="fbToggleChip(this)">Multiplayer</button>
+      <button class="fb-chip" data-v="more-ragas" onclick="fbToggleChip(this)">More ragas</button>
+      <button class="fb-chip" data-v="practice" onclick="fbToggleChip(this)">Practice mode</button>
+      <button class="fb-chip" data-v="aaroha" onclick="fbToggleChip(this)">Aaroha / Avaroha</button>
+    </div>
+    <textarea id="fb-text" placeholder="Anything else on your mind?"></textarea>
+    <button id="fb-send-btn" onclick="fbSubmit()">Send feedback</button>
+    <button class="fb-sheet-skip" onclick="fbSheetSkip()">Skip →</button>
+  </div>
+
   <!-- 3-2-1 COUNTDOWN (overlays any screen) -->
   <div id="go-countdown">
     <div id="go-num">3</div>
@@ -456,11 +507,16 @@ function shuffle(arr){ for(let i=arr.length-1;i>0;i--){ const j=Math.floor(Math.
 function drawN(arr,n){ return shuffle([...arr]).slice(0,n); }
 function modeLabel(){ return {easy:'Easy',notSoEasy:'Not So Easy',surpriseMe:'Surprise Me'}[difficulty]||difficulty; }
 
+// ── Feedback analytics endpoint (optional Google Sheets logger) ──
+// Setup: Extensions → Apps Script → paste doPost handler → Deploy as web app (Anyone) → paste URL here
+const SHEETS_ENDPOINT = ''; // e.g. 'https://script.google.com/macros/s/YOUR_ID/exec'
+
 let difficulty='easy', timePerRaga=8, ragaCount=10;
 let lastSurpriseThemeIdx=-1, activeTheme=null;
 let currentIdx=0, ragaList=[], cdInterval=null, secondsLeft=0;
 let mediaStream=null, mediaRecorder=null, chunks=[];
 let isRecording=false, startTime=null;
+let sessionPlayCount=parseInt(localStorage.getItem('rc_play_count')||'0');
 let recCanvas=null, recCtx=null, drawRunning=false;
 let finalBlob=null;
 let _cdDeleteToken=null; // kept private — not on window
@@ -751,9 +807,7 @@ function startRecording(){
   g4.addColorStop(0,'rgba(0,0,0,0)'); g4.addColorStop(1,'rgba(0,0,0,0.95)');
   const g5=recCtx.createRadialGradient(W/2,0,0,W/2,0,W*0.8);
   g5.addColorStop(0,'rgba(26,16,0,0.8)'); g5.addColorStop(1,'rgba(0,0,0,0)');
-  const g6=recCtx.createRadialGradient(W/2,TOP_H+MID_H*0.5,MID_H*0.12,W/2,TOP_H+MID_H*0.5,W*0.76);
-  g6.addColorStop(0,'rgba(0,0,0,0)'); g6.addColorStop(1,'rgba(0,0,0,0.52)');
-  cachedGrads={topFade:g1,botFade:g2,slotTop:g3,slotBot:g4,endBg:g5,vignette:g6};
+  cachedGrads={topFade:g1,botFade:g2,slotTop:g3,slotBot:g4,endBg:g5};
   const cs=recCanvas.captureStream(24);
   mediaStream.getAudioTracks().forEach(t=>cs.addTrack(t));
   const mimes=['video/mp4;codecs=h264,aac','video/mp4','video/webm;codecs=vp9,opus','video/webm;codecs=vp8,opus','video/webm'];
@@ -764,6 +818,7 @@ function startRecording(){
   isRecording=true; drawRunning=true; lastDrawTime=0;
   slotSpinning=false; ragaRevealAt=0; ragaRevealName='';
   fbReaction=null; fbShared=false;
+  sessionPlayCount++; localStorage.setItem('rc_play_count', sessionPlayCount);
   mediaRecorder.start(100); startTime=Date.now();
   document.fonts.ready.then(()=>drawLoop(video,CW,CH,dpr));
 }
@@ -804,7 +859,6 @@ function drawLoop(video,W,H,dpr=1){
   // ── Gradient overlays (constrained to camera section) — use cached ──
   ctx.fillStyle=cachedGrads.topFade; ctx.fillRect(0,TOP_H,W,MID_H*0.35);
   ctx.fillStyle=cachedGrads.botFade; ctx.fillRect(0,BOT_Y-MID_H*0.25,W,MID_H*0.25);
-  ctx.fillStyle=cachedGrads.vignette; ctx.fillRect(0,TOP_H,W,MID_H);
 
   // ── Gold separator line (top bar / camera boundary) ──
   ctx.strokeStyle='rgba(245,200,66,0.2)'; ctx.lineWidth=1;
@@ -1086,7 +1140,12 @@ function endChallenge(){
   const endMs=Math.max(3500, Math.round((0.5+n*stagger+1.5)*1000));
   setTimeout(()=>{
     endCardActive=false;
-    stopRecording(()=>{ processVideoInBackground(); });
+    stopRecording(()=>{
+      // Release camera immediately — recording is done, no reason to keep it active
+      if(mediaStream){ mediaStream.getTracks().forEach(t=>t.stop()); mediaStream=null; }
+      document.getElementById('video-bg').srcObject=null;
+      processVideoInBackground();
+    });
   }, endMs);
 }
 
@@ -1317,45 +1376,79 @@ function showFeedbackProminent(){
 function fbReact(v){
   if(fbReaction) return; // prevent double-tap
   fbReaction=v;
-  const strip=document.getElementById('feedback-strip');
-  if(!strip) return;
-  strip.innerHTML=`
-    <div class="fb-card">
-      <div class="fb-card-label">✓ Thanks!</div>
-      <div class="fb-chips-label">What would you love to see next?</div>
-      <div class="fb-chip-grid">
-        <button class="fb-chip" data-v="multiplayer" onclick="fbToggleChip(this)">Multiplayer</button>
-        <button class="fb-chip" data-v="more-ragas" onclick="fbToggleChip(this)">More ragas</button>
-        <button class="fb-chip" data-v="practice" onclick="fbToggleChip(this)">Practice mode</button>
-        <button class="fb-chip" data-v="aaroha" onclick="fbToggleChip(this)">Aaroha / Avaroha</button>
-      </div>
-      <button class="fb-skip" onclick="fbSubmit()">Skip →</button>
-    </div>`;
+  fbSheetOpen();
+}
+
+function fbSheetOpen(){
+  document.querySelectorAll('#fb-chip-grid .fb-chip').forEach(c=>c.classList.remove('selected'));
+  document.getElementById('fb-text').value='';
+  document.getElementById('fb-sheet-backdrop').classList.add('open');
+  document.getElementById('fb-sheet').classList.add('open');
+}
+
+function fbSheetClose(){
+  document.getElementById('fb-sheet-backdrop').classList.remove('open');
+  document.getElementById('fb-sheet').classList.remove('open');
+}
+
+function fbSheetSkip(){
+  fbSheetClose();
+  fbReaction=null; // allow re-tap
 }
 
 function fbToggleChip(el){
   el.classList.toggle('selected');
-  clearTimeout(window._fbChipTimer);
-  window._fbChipTimer=setTimeout(fbSubmit, 1800);
 }
 
 function fbSubmit(){
-  clearTimeout(window._fbChipTimer);
-  const chips=[...document.querySelectorAll('.fb-chip.selected')].map(c=>c.dataset.v);
+  const chips=[...document.querySelectorAll('#fb-chip-grid .fb-chip.selected')].map(c=>c.dataset.v);
+  const text=(document.getElementById('fb-text')?.value||'').trim();
+  const ua=navigator.userAgent;
+  const isMobile=/Mobi|Android/i.test(ua);
+  const browserName=(()=>{
+    if(/Edg\//.test(ua)) return 'Edge';
+    if(/OPR\/|Opera/.test(ua)) return 'Opera';
+    if(/Chrome\//.test(ua)) return 'Chrome';
+    if(/Safari\//.test(ua)&&!/Chrome/.test(ua)) return 'Safari';
+    if(/Firefox\//.test(ua)) return 'Firefox';
+    return 'Other';
+  })();
+  const payload={
+    // Feedback
+    reaction:        fbReaction||'',
+    features:        chips.join(', '),
+    comment:         text,
+    // Session details
+    mode:            modeLabel(),
+    ragas_completed: currentIdx,
+    ragas_possible:  ragaList.length,
+    ragas_list:      ragaList.slice(0,currentIdx).join(', '),
+    seconds_per_raga:timePerRaga,
+    time_spent_s:    challengeElapsed,
+    theme:           activeTheme?.name||'',
+    play_count:      sessionPlayCount,
+    // User context
+    device:          isMobile?'mobile':'desktop',
+    browser:         browserName,
+    os:              navigator.platform||'',
+    language:        navigator.language,
+    screen_size:     screen.width+'x'+screen.height,
+    timezone:        Intl.DateTimeFormat().resolvedOptions().timeZone,
+    connection:      navigator.connection?.effectiveType||'',
+    timestamp:       new Date().toISOString(),
+  };
   try{
     fetch('https://formsubmit.co/ajax/kiranrajgopal@gmail.com',{
       method:'POST',
       headers:{'Content-Type':'application/json','Accept':'application/json'},
-      body:JSON.stringify({
-        reaction: fbReaction||'',
-        features: chips.join(','),
-        raga_count: currentIdx,
-        difficulty: difficulty,
-        _subject: 'Raga Challenge Feedback',
-        _captcha: 'false'
-      })
+      body:JSON.stringify({...payload,_subject:'Raga Challenge Feedback',_captcha:'false'})
     });
   }catch(e){}
+  // Secondary: Google Sheets logger (set SHEETS_ENDPOINT above to enable)
+  if(SHEETS_ENDPOINT){
+    try{ fetch(SHEETS_ENDPOINT,{method:'POST',body:JSON.stringify(payload),headers:{'Content-Type':'application/json'}}); }catch(e){}
+  }
+  fbSheetClose();
   const strip=document.getElementById('feedback-strip');
   if(!strip) return;
   strip.innerHTML='<div class="fb-thanks" id="fb-thanks">Thanks ❤️</div>';
@@ -1391,6 +1484,7 @@ function restart(){
   challengeElapsed=0; uploadFailed=false; nativeMp4=false;
   endCardActive=false; endCardStart=0;
   fbReaction=null; fbShared=false;
+  fbSheetClose();
   // Reset feedback strip to ambient
   const strip=document.getElementById('feedback-strip');
   if(strip) strip.innerHTML=`<div class="fb-ambient"><span class="fb-ambient-label">How was it?</span><div class="fb-emoji-row"><button onclick="fbReact('love')" aria-label="Loved it">❤️</button><button onclick="fbReact('ok')" aria-label="It's ok">😐</button><button onclick="fbReact('nope')" aria-label="Not yet">😕</button></div></div>`;

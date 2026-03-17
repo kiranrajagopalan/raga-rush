@@ -1021,10 +1021,10 @@ function drawLoop(video,W,H,dpr=1){
   ctx.fillStyle='rgba(230,57,70,0.80)'; ctx.textAlign='left';
   ctx.fillText('REC',W*0.082,topY);
 
-  // ── Counter ──
+  // ── Counter — X measured after REC text to prevent overlap ──
   ctx.font='600 '+fs(0.046)+'px "DM Sans",sans-serif';
   ctx.fillStyle='rgba(255,255,255,0.92)'; ctx.textAlign='left';
-  ctx.fillText(document.getElementById('raga-counter').textContent, W*0.135, topY);
+  ctx.fillText(document.getElementById('raga-counter').textContent, W*0.158, topY);
 
   // ── Brand name (center) ──
   ctx.font='500 '+fs(0.028)+'px "DM Sans",sans-serif';
@@ -1036,6 +1036,13 @@ function drawLoop(video,W,H,dpr=1){
   ctx.font='600 '+fs(0.036)+'px "DM Sans",sans-serif';
   ctx.fillStyle='#F5C842'; ctx.textAlign='right';
   ctx.fillText(difficulty.toUpperCase(), W*0.93, topY);
+
+  // ── Bottom section layout — fixed px from BOT_Y, device-height independent ──
+  const bNameFS = fs(0.085);             // raga name font (width-based, consistent)
+  const bRR     = Math.round(W*0.09);   // ring radius (width-based)
+  const bNowY   = BOT_Y + 14 + 12;     // NOW SING baseline: 14px gap below camera + 12px font
+  const bNameY  = bNowY + 10 + bNameFS;// raga name baseline: 10px gap + font height
+  const bRingCY = bNameY + 16 + bRR;   // ring centre: 16px gap below name + radius
 
   // ── Bottom section: slot OR raga reveal ──
   const showSlot = slotSpinning;
@@ -1092,25 +1099,22 @@ function drawLoop(video,W,H,dpr=1){
     ctx.restore();
 
   } else if(ragaRevealAt>0){
-    // ── Raga reveal: name at winner-row Y immediately; NOW SING fades in after 120ms ──
+    // ── Raga reveal: fixed-pixel positions, device-height independent ──
     const name=ragaRevealName||document.getElementById('raga-name').textContent;
     if(name&&name!=='—'){
       const elapsed=now-ragaRevealAt;
       const nowSingFade=Math.min(1,Math.max(0,(elapsed-120)/280));
-      const wH=160, wY=BOT_Y+14, IH=53; // matches slot machine branch
-      const WINNER_CY=wY+IH/2; // exact centre of winner row
       // NOW SING
       ctx.letterSpacing='4px';
-      ctx.font='700 10px "DM Sans",sans-serif';
+      ctx.font='700 12px "DM Sans",sans-serif';
       ctx.fillStyle='rgba(245,200,66,'+(0.85*nowSingFade)+')'; ctx.textAlign='center';
-      ctx.fillText('NOW SING',W/2,wY-5);
+      ctx.fillText('NOW SING',W/2,bNowY);
       ctx.letterSpacing='0px';
-      // Raga name — full opacity immediately, at winner row centre
-      const nameFsize=fs(0.085);
-      ctx.font='600 '+nameFsize+'px "Cormorant Garamond",serif';
+      // Raga name
+      ctx.font='600 '+bNameFS+'px "Cormorant Garamond",serif';
       ctx.fillStyle='white'; ctx.textAlign='center';
       ctx.shadowColor='rgba(245,200,66,0.65)'; ctx.shadowBlur=55;
-      ctx.fillText(name,W/2,WINNER_CY+nameFsize*0.36);
+      ctx.fillText(name,W/2,bNameY);
       ctx.shadowBlur=0;
     }
   }
@@ -1121,7 +1125,7 @@ function drawLoop(video,W,H,dpr=1){
     const ringAlpha=Math.min(1,Math.max(0,(elapsed-120)/280));
     if(ringAlpha>0){
       ctx.globalAlpha=ringAlpha;
-      const rCX=W/2, rCY=BOT_Y+BOT_H*0.38, rR=W*0.09; // moved up for IG safe zone
+      const rCX=W/2, rCY=bRingCY, rR=bRR; // fixed-pixel anchor, device-height independent
       const frac=Math.max(0,secondsLeft/timePerRaga);
       ctx.beginPath(); ctx.arc(rCX,rCY,rR,0,Math.PI*2);
       ctx.strokeStyle='rgba(255,255,255,0.12)'; ctx.lineWidth=4*dpr; ctx.stroke();
@@ -1349,13 +1353,19 @@ async function deleteFromCloudinary(){
 }
 
 async function shareOrDownload(){
+  const btn=document.getElementById('dl-btn');
+  if(btn._sharing) return; // prevent concurrent calls (second tap while share sheet is open)
+  btn._sharing=true;
+
   const blob=mp4Blob||finalBlob;
-  if(!blob){ alert('No recording found.'); return; }
+  if(!blob){ btn._sharing=false; alert('No recording found.'); return; }
   const isMp4=!!mp4Blob;
   const ext=isMp4?'.mp4':'.webm';
   const mime=isMp4?'video/mp4':'video/webm';
   const filename='raga-challenge-'+difficulty+'-'+Date.now()+ext;
-  const file=new File([blob], filename, {type:mime});
+  // blob.slice(0) forces a fresh Blob copy — avoids iOS WebKit blob-reuse issue
+  // where the same Blob reference on a second share falls through to download
+  const file=new File([blob.slice(0)], filename, {type:mime});
 
   // Try Web Share API (works on mobile Safari + Android Chrome)
   if(navigator.canShare && navigator.canShare({files:[file]})){
@@ -1367,9 +1377,11 @@ async function shareOrDownload(){
       });
       setTimeout(deleteFromCloudinary,3000);
       if(!fbShared){ fbShared=true; showFeedbackProminent(); }
-      return;
+      btn._sharing=false; return;
     }catch(e){
-      if(e.name==='AbortError') return;
+      btn._sharing=false;
+      if(e.name==='AbortError') return; // user cancelled share sheet
+      // other errors (NotAllowedError etc.) fall through to download
     }
   }
 
@@ -1380,6 +1392,7 @@ async function shareOrDownload(){
   setTimeout(()=>URL.revokeObjectURL(url),2000);
   setTimeout(deleteFromCloudinary,3000);
   if(!fbShared){ fbShared=true; showFeedbackProminent(); }
+  btn._sharing=false;
 }
 
 // ── Feedback functions ──

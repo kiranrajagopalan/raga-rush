@@ -804,12 +804,16 @@ function startRecording(){
   const g5=recCtx.createRadialGradient(W/2,0,0,W/2,0,W*0.8);
   g5.addColorStop(0,'rgba(26,16,0,0.8)'); g5.addColorStop(1,'rgba(0,0,0,0)');
   cachedGrads={slotTop:g3,slotBot:g4,endBg:g5};
-  const cs=recCanvas.captureStream(30);
-  mediaStream.getAudioTracks().forEach(t=>cs.addTrack(t));
+  const videoStream=recCanvas.captureStream(30);
+  const audioTracks=mediaStream.getAudioTracks();
+  // Explicit MediaStream constructor is required on Android Chrome — addTrack() silently drops audio
+  const cs=audioTracks.length>0
+    ? new MediaStream([...videoStream.getVideoTracks(),...audioTracks])
+    : videoStream;
   const mimes=['video/mp4;codecs=h264,aac','video/mp4','video/webm;codecs=vp9,opus','video/webm;codecs=vp8,opus','video/webm'];
   const mime=mimes.find(m=>MediaRecorder.isTypeSupported(m))||'video/webm';
   nativeMp4=mime.startsWith('video/mp4');
-  mediaRecorder=new MediaRecorder(cs,{mimeType:mime,videoBitsPerSecond:5000000});
+  mediaRecorder=new MediaRecorder(cs,{mimeType:mime,videoBitsPerSecond:5000000,audioBitsPerSecond:128000});
   mediaRecorder.ondataavailable=e=>{ if(e.data.size>0) chunks.push(e.data); };
   isRecording=true; drawRunning=true; lastDrawTime=0;
   slotSpinning=false; ragaRevealAt=0; ragaRevealName='';
@@ -1093,7 +1097,7 @@ function drawLoop(video,W,H,dpr=1){
     if(name&&name!=='—'){
       const elapsed=now-ragaRevealAt;
       const nowSingFade=Math.min(1,Math.max(0,(elapsed-120)/280));
-      const wH=160, wY=BOT_Y+(BOT_H-160)/2, IH=53;
+      const wH=160, wY=BOT_Y+14, IH=53; // matches slot machine branch
       const WINNER_CY=wY+IH/2; // exact centre of winner row
       // NOW SING
       ctx.letterSpacing='4px';

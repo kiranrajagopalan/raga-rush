@@ -1002,7 +1002,7 @@ function drawLoop(video,W,H,dpr=1){
     return;
   }
 
-  const topY=H*0.165;   // inside IG Stories safe zone (IG header covers top ~15%)
+  const topY=TOP_H*0.62; // in the solid black top section — guaranteed contrast on any camera background
   const fs=s=>Math.round(W*s);
 
   // ── Slot state: driven by event notifications, no DOM polling needed ──
@@ -1013,27 +1013,27 @@ function drawLoop(video,W,H,dpr=1){
   const recDotVisible=Math.floor(now/700)%2===0;
   if(recDotVisible){
     ctx.fillStyle='#E63946';
-    ctx.beginPath(); ctx.arc(W*0.055,topY-3,W*0.013,0,Math.PI*2); ctx.fill();
+    ctx.beginPath(); ctx.arc(W*0.055,topY-3,W*0.016,0,Math.PI*2); ctx.fill();
   }
 
   // ── REC text label (always visible, not dependent on blink) ──
-  ctx.font='600 '+fs(0.022)+'px "DM Sans",sans-serif';
+  ctx.font='600 '+fs(0.030)+'px "DM Sans",sans-serif';
   ctx.fillStyle='rgba(230,57,70,0.80)'; ctx.textAlign='left';
-  ctx.fillText('REC',W*0.078,topY);
+  ctx.fillText('REC',W*0.082,topY);
 
   // ── Counter ──
-  ctx.font='600 '+fs(0.040)+'px "DM Sans",sans-serif';
+  ctx.font='600 '+fs(0.046)+'px "DM Sans",sans-serif';
   ctx.fillStyle='rgba(255,255,255,0.92)'; ctx.textAlign='left';
-  ctx.fillText(document.getElementById('raga-counter').textContent, W*0.13, topY);
+  ctx.fillText(document.getElementById('raga-counter').textContent, W*0.135, topY);
 
   // ── Brand name (center) ──
-  ctx.font='500 '+fs(0.026)+'px "DM Sans",sans-serif';
+  ctx.font='500 '+fs(0.028)+'px "DM Sans",sans-serif';
   ctx.fillStyle='rgba(245,200,66,0.82)';
   ctx.textAlign='center';
   ctx.fillText('\u2726 RAGA CHALLENGE', W/2, topY);
 
   // ── Difficulty ──
-  ctx.font='600 '+fs(0.032)+'px "DM Sans",sans-serif';
+  ctx.font='600 '+fs(0.036)+'px "DM Sans",sans-serif';
   ctx.fillStyle='#F5C842'; ctx.textAlign='right';
   ctx.fillText(difficulty.toUpperCase(), W*0.93, topY);
 
@@ -1568,6 +1568,172 @@ function showScreen(id){
   btn.addEventListener('mouseleave', cancelHold);
   btn.addEventListener('touchend', cancelHold);
   btn.addEventListener('touchcancel', cancelHold);
+})();
+
+// ─────────────────────────────────────────────────────────────
+// CANVAS DEBUG MODE  —  ?debug in URL activates a dev overlay
+// Renders all recording canvas states without camera access.
+// Usage: http://localhost:8000/raga-challenge.html?debug
+// ─────────────────────────────────────────────────────────────
+(function(){
+  if(!new URLSearchParams(location.search).has('debug')) return;
+
+  const CW=390, CH=844;
+  let dbCanvas=null, dbCtx=null, activeBtn=null, igVisible=true;
+
+  // ── Build debug canvas (phone-sized, centred above panel) ──
+  function buildCanvas(){
+    const wrap=document.createElement('div');
+    wrap.id='dbg-wrap';
+    wrap.style.cssText='position:fixed;inset:0;display:flex;flex-direction:column;align-items:center;justify-content:center;background:#0a0a0a;z-index:9000;pointer-events:none;padding-bottom:96px;box-sizing:border-box;';
+    dbCanvas=document.createElement('canvas');
+    dbCanvas.width=CW; dbCanvas.height=CH;
+    dbCanvas.style.cssText='max-width:min(390px,100vw);max-height:calc(100vh - 116px);object-fit:contain;border:1px solid rgba(255,255,255,0.08);border-radius:4px;pointer-events:auto;display:block;';
+    wrap.appendChild(dbCanvas);
+    document.body.appendChild(wrap);
+    dbCtx=dbCanvas.getContext('2d');
+  }
+
+  // ── Build control panel ──
+  function buildPanel(){
+    const panel=document.createElement('div');
+    panel.id='dbg-panel';
+    panel.style.cssText='position:fixed;bottom:0;left:0;right:0;background:#111;border-top:1px solid rgba(255,255,255,0.12);padding:10px 14px 20px;z-index:9001;font-family:monospace;display:flex;flex-direction:column;gap:8px;';
+
+    const header=document.createElement('div');
+    header.style.cssText='display:flex;align-items:center;justify-content:space-between;';
+    header.innerHTML='<span style="color:rgba(245,200,66,0.7);font-size:11px;letter-spacing:2px;">CANVAS DEBUG</span>';
+    const closeBtn=document.createElement('button');
+    closeBtn.textContent='✕';
+    closeBtn.style.cssText='background:none;border:none;color:rgba(255,255,255,0.4);font-size:14px;cursor:pointer;padding:0;font-family:monospace;';
+    closeBtn.onclick=()=>{ document.getElementById('dbg-wrap')?.remove(); panel.remove(); };
+    header.appendChild(closeBtn);
+    panel.appendChild(header);
+
+    const btns=document.createElement('div');
+    btns.style.cssText='display:flex;gap:6px;flex-wrap:wrap;';
+    [['top-bar','Top Bar'],['slot','Slot'],['raga','Raga Reveal'],['endcard','End Card']].forEach(([key,label])=>{
+      const b=document.createElement('button');
+      b.textContent=label;
+      b.dataset.state=key;
+      b.style.cssText='flex:1;padding:8px 6px;background:rgba(255,255,255,0.04);border:1px solid rgba(255,255,255,0.14);border-radius:8px;color:rgba(255,255,255,0.7);font-size:12px;font-family:monospace;cursor:pointer;transition:border-color 0.15s,color 0.15s;';
+      b.onclick=()=>{ if(activeBtn) activeBtn.style.borderColor='rgba(255,255,255,0.14)'; activeBtn=b; b.style.borderColor='#F5C842'; renderState(key); };
+      btns.appendChild(b);
+    });
+    panel.appendChild(btns);
+
+    const footer=document.createElement('label');
+    footer.style.cssText='display:flex;align-items:center;gap:6px;color:rgba(255,255,255,0.40);font-size:11px;cursor:pointer;';
+    const chk=document.createElement('input');
+    chk.type='checkbox'; chk.id='dbg-ig-chk'; chk.checked=true;
+    chk.style.cssText='accent-color:#F5C842;width:13px;height:13px;';
+    chk.onchange=e=>{ igVisible=e.target.checked; if(activeBtn) renderState(activeBtn.dataset.state); };
+    footer.appendChild(chk);
+    footer.appendChild(document.createTextNode('IG Safe Zones'));
+    panel.appendChild(footer);
+    document.body.appendChild(panel);
+  }
+
+  // ── Ensure gradients are ready on the debug canvas ──
+  function ensureGrads(){
+    if(Object.keys(cachedGrads).length>0) return;
+    const TOP_H2=CH*0.15,BOT_Y2=CH*0.70,BOT_H2=CH*0.30;
+    const wY2=BOT_Y2+14,wH2=160;
+    const g3=dbCtx.createLinearGradient(0,wY2,0,wY2+wH2*0.38);
+    g3.addColorStop(0,'rgba(0,0,0,0.95)'); g3.addColorStop(1,'rgba(0,0,0,0)');
+    const g4=dbCtx.createLinearGradient(0,wY2+wH2*0.62,0,wY2+wH2);
+    g4.addColorStop(0,'rgba(0,0,0,0)'); g4.addColorStop(1,'rgba(0,0,0,0.95)');
+    const g5=dbCtx.createRadialGradient(CW/2,0,0,CW/2,0,CW*0.8);
+    g5.addColorStop(0,'rgba(26,16,0,0.8)'); g5.addColorStop(1,'rgba(0,0,0,0)');
+    cachedGrads={slotTop:g3,slotBot:g4,endBg:g5};
+  }
+
+  // ── Inject & clean up fake slot items ──
+  function injectSlotItems(){
+    const inner=document.getElementById('slot-inner');
+    ['Bhairavi','Kharaharapriya','Shankarābharanam'].forEach((n,i)=>{
+      const el=document.createElement('div');
+      el.className='slot-item'+(i===2?' center':'');
+      el.textContent=n; el._dbg=true; inner.prepend(el);
+    });
+  }
+  function cleanSlotItems(){
+    document.querySelectorAll('#slot-inner .slot-item[_dbg]').forEach(el=>el.remove());
+    document.querySelectorAll('#slot-inner .slot-item').forEach(el=>{ if(el._dbg) el.remove(); });
+  }
+
+  // ── IG overlay ──
+  function drawIG(ctx,W,H){
+    ctx.save();
+    ctx.fillStyle='rgba(255,50,50,0.16)'; ctx.fillRect(0,0,W,H*0.15);
+    ctx.fillRect(0,H*0.82,W,H*0.18);
+    ctx.strokeStyle='rgba(255,60,60,0.75)'; ctx.lineWidth=1.5; ctx.setLineDash([5,4]);
+    ctx.beginPath(); ctx.moveTo(0,H*0.15); ctx.lineTo(W,H*0.15); ctx.stroke();
+    ctx.beginPath(); ctx.moveTo(0,H*0.82); ctx.lineTo(W,H*0.82); ctx.stroke();
+    ctx.setLineDash([]);
+    ctx.font='bold 10px monospace'; ctx.fillStyle='rgba(255,80,80,0.85)'; ctx.textAlign='left';
+    ctx.fillText('▲ IG HEADER (H×0.15)',8,H*0.135);
+    ctx.fillText('▼ IG SAFE BOTTOM (H×0.82)',8,H*0.800);
+    ctx.restore();
+  }
+
+  // ── Main render ──
+  function renderState(state){
+    recCanvas=dbCanvas; recCtx=dbCtx;
+    ensureGrads();
+
+    // Pre-fill camera section with warm skin-tone fill (simulates person on camera)
+    dbCtx.fillStyle='#7a6650';
+    dbCtx.fillRect(0,CH*0.15,CW,CH*0.55);
+
+    // Reset all recording state flags
+    endCardActive=false; countdownActive=false; countdownText='';
+    slotSpinning=false; ragaRevealAt=0; ragaRevealName='';
+
+    // Ensure fake raga list exists
+    ragaList=['Shankarābharanam','Kharaharapriya','Tōdi','Kalyāni','Bhairavi'];
+    currentIdx=5; difficulty='easy';
+
+    cleanSlotItems();
+
+    if(state==='slot'){
+      slotSpinning=true;
+      injectSlotItems();
+      slotOffset=0;
+    } else if(state==='raga'){
+      slotSpinning=false;
+      ragaRevealAt=performance.now()-1800;
+      ragaRevealName='Shankarābharanam';
+      secondsLeft=3; timePerRaga=5;
+    } else if(state==='endcard'){
+      endCardActive=true; endCardStart=Date.now()-4200;
+      showResultsScreen && showResultsScreen();
+    } else if(state==='top-bar'){
+      slotSpinning=false; ragaRevealAt=0;
+      // just the top bar + camera fill — slot/reveal areas empty
+    }
+
+    // Draw one frame
+    const dummyVid=document.createElement('video');
+    drawRunning=true;
+    drawLoop(dummyVid,CW,CH,1);
+    setTimeout(()=>{ drawRunning=false; },50);
+
+    // IG overlay on top
+    if(igVisible) setTimeout(()=>drawIG(dbCtx,CW,CH),60);
+
+    // Restore state
+    setTimeout(()=>{ endCardActive=false; cleanSlotItems(); },200);
+  }
+
+  buildCanvas();
+  buildPanel();
+
+  // Auto-render top-bar state on load
+  setTimeout(()=>{
+    const first=document.querySelector('#dbg-panel button[data-state="top-bar"]');
+    if(first) first.click();
+  }, 400);
 })();
 </script>
 

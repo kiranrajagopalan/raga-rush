@@ -509,7 +509,7 @@ function modeLabel(){ return {easy:'Easy',notSoEasy:'Not So Easy',surpriseMe:'Su
 
 // ── Feedback analytics endpoint (optional Google Sheets logger) ──
 // Setup: Extensions → Apps Script → paste doPost handler → Deploy as web app (Anyone) → paste URL here
-const SHEETS_ENDPOINT = ''; // e.g. 'https://script.google.com/macros/s/YOUR_ID/exec'
+const SHEETS_ENDPOINT = 'https://script.google.com/macros/s/AKfycbxxePj6LXD2l7eEhop971eMQHoMTUaijBhvfKzQY_tozGRIp4HrXnXUlZaa_thxqFg/exec';
 
 let difficulty='easy', timePerRaga=8, ragaCount=10;
 let lastSurpriseThemeIdx=-1, activeTheme=null;
@@ -517,6 +517,7 @@ let currentIdx=0, ragaList=[], cdInterval=null, secondsLeft=0;
 let mediaStream=null, mediaRecorder=null, chunks=[];
 let isRecording=false, startTime=null;
 let sessionPlayCount=parseInt(localStorage.getItem('rc_play_count')||'0');
+let sessionId='';
 let recCanvas=null, recCtx=null, drawRunning=false;
 let finalBlob=null;
 let _cdDeleteToken=null; // kept private — not on window
@@ -819,6 +820,7 @@ function startRecording(){
   slotSpinning=false; ragaRevealAt=0; ragaRevealName='';
   fbReaction=null; fbShared=false;
   sessionPlayCount++; localStorage.setItem('rc_play_count', sessionPlayCount);
+  sessionId='rc_'+Date.now().toString(36)+'_'+Math.random().toString(36).slice(2,6);
   mediaRecorder.start(100); startTime=Date.now();
   document.fonts.ready.then(()=>drawLoop(video,CW,CH,dpr));
 }
@@ -1215,6 +1217,7 @@ function showResultsScreen(){
     revealEl.style.display='none';
   }
   showScreen('done-screen');
+  logSession();
   // Show processing overlay or enable download if already ready
   if(mp4Blob){
     enableDownloadButton();
@@ -1228,6 +1231,38 @@ function showResultsScreen(){
     btn.classList.add('processing');
     btn.disabled=true;
   }
+}
+
+function logSession(){
+  if(!SHEETS_ENDPOINT) return;
+  const ua=navigator.userAgent;
+  const isMobile=/Mobi|Android/i.test(ua);
+  const browserName=(()=>{
+    if(/Edg\//.test(ua)) return 'Edge';
+    if(/OPR\/|Opera/.test(ua)) return 'Opera';
+    if(/Chrome\//.test(ua)) return 'Chrome';
+    if(/Safari\//.test(ua)&&!/Chrome/.test(ua)) return 'Safari';
+    if(/Firefox\//.test(ua)) return 'Firefox';
+    return 'Other';
+  })();
+  try{ fetch(SHEETS_ENDPOINT,{
+    method:'POST',
+    headers:{'Content-Type':'application/json'},
+    body:JSON.stringify({
+      type:'session', session_id:sessionId,
+      timestamp:new Date().toISOString(),
+      mode:modeLabel(), ragas_completed:currentIdx,
+      ragas_possible:ragaList.length,
+      ragas_list:ragaList.slice(0,currentIdx).join(', '),
+      seconds_per_raga:timePerRaga, time_spent_s:challengeElapsed,
+      theme:activeTheme?.name||'', play_count:sessionPlayCount,
+      device:isMobile?'mobile':'desktop', browser:browserName,
+      os:navigator.platform||'', language:navigator.language,
+      screen_size:screen.width+'x'+screen.height,
+      timezone:Intl.DateTimeFormat().resolvedOptions().timeZone,
+      connection:navigator.connection?.effectiveType||'',
+    })
+  }); }catch(e){}
 }
 
 function enableDownloadButton(){
@@ -1454,6 +1489,8 @@ function fbSubmit(){
     return 'Other';
   })();
   const payload={
+    type:            'feedback',
+    session_id:      sessionId,
     // Feedback
     reaction:        fbReaction||'',
     features:        chips.join(', '),

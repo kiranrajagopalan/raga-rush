@@ -822,6 +822,20 @@ function startRecording(){
   sessionPlayCount++; localStorage.setItem('rc_play_count', sessionPlayCount);
   sessionId='rc_'+Date.now().toString(36)+'_'+Math.random().toString(36).slice(2,6);
   mediaRecorder.start(100); startTime=Date.now();
+  // Pause/resume MediaRecorder on visibility change — prevents audio/video desync
+  // when Android dims the screen (rAF pauses but audio track keeps running)
+  const onVisChange=()=>{
+    if(!isRecording||!mediaRecorder){ document.removeEventListener('visibilitychange',onVisChange); return; }
+    if(document.hidden){
+      if(mediaRecorder.state==='recording') mediaRecorder.pause();
+    } else {
+      if(mediaRecorder.state==='paused'){
+        mediaRecorder.resume();
+        requestAnimationFrame(()=>drawLoop(video,CW,CH,dpr)); // restart rAF chain
+      }
+    }
+  };
+  document.addEventListener('visibilitychange',onVisChange);
   document.fonts.ready.then(()=>drawLoop(video,CW,CH,dpr));
 }
 
@@ -1340,7 +1354,7 @@ async function processVideoInBackground(){
       xhr.send(fd);
     });
 
-    mp4Url=res.secure_url.replace(/\/upload\//, '/upload/f_mp4/').replace(/\.[^.]+$/, '.mp4');
+    mp4Url=res.secure_url.replace(/\/upload\//, '/upload/f_mp4,vc_h264,ac_aac,af_44100/').replace(/\.[^.]+$/, '.mp4');
     if(res.delete_token) _cdDeleteToken=res.delete_token;
 
     // Fetch MP4 blob immediately (eliminates second overlay)

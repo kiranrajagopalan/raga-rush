@@ -527,6 +527,7 @@ let endCardActive=false, endCardStart=0;
 let slotOffset=0, cachedGrads={}, lastDrawTime=0;
 let slotSpinning=false, ragaRevealAt=0, ragaRevealName='';
 let fbReaction=null, fbShared=false;
+let captureTrack=null; // CanvasCaptureMediaStreamTrack for frame-on-demand (Bug 1 fix)
 const DRAW_INTERVAL=1000/30; // target 30fps draw rate
 const DONE_TITLES=[
   'Todi\u2011ally crushed it!',
@@ -805,8 +806,14 @@ function startRecording(){
   const g5=recCtx.createRadialGradient(W/2,0,0,W/2,0,W*0.8);
   g5.addColorStop(0,'rgba(26,16,0,0.8)'); g5.addColorStop(1,'rgba(0,0,0,0)');
   cachedGrads={slotTop:g3,slotBot:g4,endBg:g5};
-  const videoStream=recCanvas.captureStream(30);
-  const audioTracks=mediaStream.getAudioTracks();
+  // captureStream(0) = frame-on-demand: frames are only committed when requestFrame() is called.
+  // Prevents frozen video when Android Chrome throttles rAF (screen dim, battery saver) —
+  // captureStream(30) would repeat the last frame; captureStream(0) waits for an explicit push.
+  const videoStream=recCanvas.captureStream(0);
+  captureTrack=videoStream.getVideoTracks()[0];
+  // Only include audio tracks that are actively live — ended tracks (can happen on Android
+  // if the mic was backgrounded between recordings) produce a silently muted stream.
+  const audioTracks=mediaStream.getAudioTracks().filter(t=>t.readyState==='live');
   // Explicit MediaStream constructor is required on Android Chrome — addTrack() silently drops audio
   const cs=audioTracks.length>0
     ? new MediaStream([...videoStream.getVideoTracks(),...audioTracks])
@@ -1160,12 +1167,16 @@ function drawLoop(video,W,H,dpr=1){
     }
   }
 
+  // Explicit frame push — required because we use captureStream(0).
+  // Called after every completed paint so the canvas track only emits real frames.
+  captureTrack?.requestFrame?.();
   requestAnimationFrame(()=>drawLoop(video,W,H,dpr));
 }
 
 function stopRecording(onStopped){
   if(!isRecording){ onStopped&&onStopped(); return; }
   drawRunning=false; isRecording=false;
+  captureTrack=null; // release frame-capture reference
   document.getElementById('rec-badge').classList.remove('visible');
   mediaRecorder.onstop=()=>{ onStopped&&onStopped(); };
   mediaRecorder.stop();
@@ -1406,15 +1417,24 @@ async function shareOrDownload(){
   if(btn._sharing) return; // prevent concurrent calls (second tap while share sheet is open)
   btn._sharing=true;
 
-  const blob=mp4Blob||finalBlob;
-  if(!blob){ btn._sharing=false; alert('No recording found.'); return; }
-  const isMp4=!!mp4Blob;
-  const ext=isMp4?'.mp4':'.webm';
-  const mime=isMp4?'video/mp4':'video/webm';
-  const filename='raga-challenge-'+difficulty+'-'+Date.now()+ext;
+  // Always share/download MP4 only — WebM (Opus audio) plays silently on WhatsApp/Android.
+  // If mp4Blob is null (Cloudinary still processing or failed), fall through to WebM download.
+  const blob=mp4Blob;
+  if(!blob){
+    // MP4 not ready — download the raw WebM as fallback (no native share to avoid silent audio)
+    const webmBlob=finalBlob;
+    if(!webmBlob){ btn._sharing=false; alert('No recording found.'); return; }
+    const url=URL.createObjectURL(webmBlob);
+    const a=document.createElement('a'); a.href=url;
+    a.download='raga-challenge-'+difficulty+'-'+Date.now()+'.webm'; a.click();
+    setTimeout(()=>URL.revokeObjectURL(url),2000);
+    if(!fbShared){ fbShared=true; showFeedbackProminent(); }
+    btn._sharing=false; return;
+  }
+  const filename='raga-challenge-'+difficulty+'-'+Date.now()+'.mp4';
   // blob.slice(0) forces a fresh Blob copy — avoids iOS WebKit blob-reuse issue
   // where the same Blob reference on a second share falls through to download
-  const file=new File([blob.slice(0)], filename, {type:mime});
+  const file=new File([blob.slice(0)], filename, {type:'video/mp4'});
 
   // Try Web Share API (works on mobile Safari + Android Chrome)
   if(navigator.canShare && navigator.canShare({files:[file]})){
@@ -1434,7 +1454,7 @@ async function shareOrDownload(){
     }
   }
 
-  // Fallback: plain download
+  // Fallback: plain download (MP4)
   const url=URL.createObjectURL(blob);
   const a=document.createElement('a'); a.href=url;
   a.download=filename; a.click();

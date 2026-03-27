@@ -513,7 +513,7 @@ function modeLabel(){ return {easy:'Easy',notSoEasy:'Not So Easy',surpriseMe:'Su
 // ── Feedback analytics endpoint (optional Google Sheets logger) ──
 // Setup: Extensions → Apps Script → paste doPost handler → Deploy as web app (Anyone) → paste URL here
 const SHEETS_ENDPOINT = 'https://script.google.com/macros/s/AKfycbx6S-nn5jBqF3ZaYACvM-Cq_7fn9WPv7Yhyikph3F_0QhZcp4Q6FHFK6DbGQ47FiGJ1/exec';
-const APP_BUILD = '20260327-b8'; // bump this on every push so Sheets confirms which build you're testing
+const APP_BUILD = '20260327-b9'; // bump this on every push so Sheets confirms which build you're testing
 
 let difficulty='easy', timePerRaga=8, ragaCount=10;
 let lastSurpriseThemeIdx=-1, activeTheme=null;
@@ -826,7 +826,7 @@ function startRecording(){
   const cs=audioTracks.length>0
     ? new MediaStream([...videoStream.getVideoTracks(),...audioTracks])
     : videoStream;
-  const mimes=['video/mp4;codecs=h264,aac','video/mp4','video/webm;codecs=vp9,opus','video/webm;codecs=vp8,opus','video/webm'];
+  const mimes=['video/mp4;codecs=avc1,mp4a.40.2','video/mp4','video/webm;codecs=vp9,opus','video/webm;codecs=vp8,opus','video/webm'];
   const mime=mimes.find(m=>MediaRecorder.isTypeSupported(m))||'video/webm';
   nativeMp4=mime.startsWith('video/mp4');
   // Halve bitrate on mobile — same quality at phone resolutions, significantly less encoder heat
@@ -1360,11 +1360,15 @@ function remuxToMp4(fmp4Blob){
             const opts={timescale:track.timescale};
             if(track.type==='video'){
               opts.type='avc1'; opts.width=track.video.width; opts.height=track.video.height;
-              opts.description=trak.mdia.minf.stbl.stsd.entries[0];
+              // Pass only the avcC box (H264 parameter sets) — NOT the full avc1 sample entry.
+              // mp4box.js addTrack() expects the codec-specific box. Passing the full stsd entry
+              // corrupts the avcC in the output, causing WhatsApp's ExoPlayer to fail validation.
+              opts.description=trak.mdia.minf.stbl.stsd.entries[0].avcC;
             } else {
               opts.type='mp4a'; opts.samplerate=track.audio.sample_rate;
               opts.channel_count=track.audio.channel_count;
-              opts.description=trak.mdia.minf.stbl.stsd.entries[0];
+              // Pass only the esds box (AAC config) — same reason as avcC above.
+              opts.description=trak.mdia.minf.stbl.stsd.entries[0].esds;
             }
             trackMap[track.id]=outFile.addTrack(opts);
             inFile.setExtractionOptions(track.id,null,{nbSamples:Infinity});
@@ -1461,15 +1465,21 @@ async function shareOrDownload(){
     let shared=false;
     if(navigator.canShare && navigator.canShare({files:[file]})){
       try{
-        await navigator.share({
-          files:[file],
-          title:'My Raga Challenge',
-          text:'I just completed a Carnatic Raga Challenge! #RagaChallenge #Carnatic'
-        });
+        // 15s timeout — navigator.share() can hang forever on some Android versions
+      // (promise never settles after WhatsApp opens), which would leave btn._sharing=true.
+      const _st=new Promise((_,r)=>setTimeout(()=>r(new Error('share-timeout')),15000));
+        await Promise.race([
+          navigator.share({
+            files:[file],
+            title:'My Raga Challenge',
+            text:'I just completed a Carnatic Raga Challenge! #RagaChallenge #Carnatic'
+          }),
+          _st
+        ]);
         shared=true;
       }catch(e){
-        if(e.name==='AbortError') return; // user cancelled — don't download either
-        // other errors (NotAllowedError etc.) fall through to download below
+        if(e.name==='AbortError') return; // user explicitly dismissed share sheet — no download
+        // share-timeout or other error: fall through to download below so user gets the file
       }
     }
 

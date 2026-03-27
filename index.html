@@ -514,7 +514,7 @@ function modeLabel(){ return {easy:'Easy',notSoEasy:'Not So Easy',surpriseMe:'Su
 // ── Feedback analytics endpoint (optional Google Sheets logger) ──
 // Setup: Extensions → Apps Script → paste doPost handler → Deploy as web app (Anyone) → paste URL here
 const SHEETS_ENDPOINT = 'https://script.google.com/macros/s/AKfycbx6S-nn5jBqF3ZaYACvM-Cq_7fn9WPv7Yhyikph3F_0QhZcp4Q6FHFK6DbGQ47FiGJ1/exec';
-const APP_BUILD = '20260327-b12'; // bump this on every push so Sheets confirms which build you're testing
+const APP_BUILD = '20260327-b14'; // bump this on every push so Sheets confirms which build you're testing
 
 let difficulty='easy', timePerRaga=8, ragaCount=10;
 let lastSurpriseThemeIdx=-1, activeTheme=null;
@@ -1353,54 +1353,107 @@ function enableDownloadButton(){
 // all samples are already in allSamples — no async wait, no nb_samples check needed.
 function remuxToMp4(fmp4Blob){
   return new Promise((resolve,reject)=>{
+    const d=window._rcDiag||(window._rcDiag={});
+    d.remux={blobSize:fmp4Blob.size,mp4boxAvail:typeof MP4Box,mp4muxerAvail:typeof Mp4Muxer};
     fmp4Blob.arrayBuffer().then(ab=>{
       try{
         const inFile=MP4Box.createFile();
-        const allSamples={};   // trackId → samples[]
-        const trackMeta={};    // trackId → {track, entry}
+        const allSamples={};
+        const trackMeta={};
+        let onReadyFired=false;
+        let onSamplesCalls=0;
 
-        inFile.onError=e=>reject(new Error('mp4box:'+e));
+        inFile.onError=e=>{
+          d.remux.error='mp4box:'+e;
+          console.log('[RC] mp4box.onError:',e);
+          reject(new Error('mp4box:'+e));
+        };
 
         inFile.onReady=info=>{
+          onReadyFired=true;
+          d.remux.tracks=info.tracks.map(t=>({id:t.id,type:t.type,codec:t.codec,nb_samples:t.nb_samples}));
+          console.log('[RC] onReady tracks='+JSON.stringify(d.remux.tracks));
           info.tracks.forEach(track=>{
             allSamples[track.id]=[];
-            const trak=inFile.getTrackById(track.id);
-            trackMeta[track.id]={track,entry:trak.mdia.minf.stbl.stsd.entries[0]};
+            try{
+              const trak=inFile.getTrackById(track.id);
+              const entry=trak.mdia.minf.stbl.stsd.entries[0];
+              trackMeta[track.id]={track,entry};
+              // Log what codec boxes exist on the entry
+              d.remux['entry'+track.id]={
+                avcC:!!entry.avcC,
+                hvcC:!!entry.hvcC,
+                esds:!!entry.esds,
+                keys:Object.keys(entry).filter(k=>!['start','size','hdr_size','type','uuid','stype'].includes(k))
+              };
+              console.log('[RC] track '+track.id+' entry boxes: '+JSON.stringify(d.remux['entry'+track.id]));
+            }catch(entryErr){
+              d.remux['entry'+track.id+'Err']=entryErr.message;
+              console.log('[RC] track '+track.id+' entry error:',entryErr.message);
+              // Still register the track with a minimal meta so extraction runs
+              const trak=inFile.getTrackById(track.id);
+              trackMeta[track.id]={track,entry:{}};
+            }
             inFile.setExtractionOptions(track.id,null,{nbSamples:Infinity});
           });
           inFile.start();
         };
 
-        // Simple accumulator — no completion check here.
-        // mp4box.js fires onSamples synchronously during appendBuffer/flush.
-        inFile.onSamples=(id,user,samples)=>{ allSamples[id].push(...samples); };
+        inFile.onSamples=(id,user,samples)=>{
+          allSamples[id].push(...samples);
+          onSamplesCalls++;
+        };
 
         const buf=ab.slice(0); buf.fileStart=0;
-        inFile.appendBuffer(buf); // fires onReady → start() → onSamples synchronously
-        inFile.flush();           // delivers any remaining samples
+        inFile.appendBuffer(buf);
+        inFile.flush();
 
-        // After appendBuffer+flush all samples are collected — build now
-        if(Object.keys(trackMeta).length===0){ reject(new Error('no tracks')); return; }
+        // Capture sample counts after synchronous processing
+        d.remux.onReadyFired=onReadyFired;
+        d.remux.onSamplesCalls=onSamplesCalls;
+        d.remux.sampleCounts={};
+        Object.keys(allSamples).forEach(id=>{ d.remux.sampleCounts[id]=allSamples[id].length; });
+        console.log('[RC] after flush: onReadyFired='+onReadyFired+' onSamplesCalls='+onSamplesCalls+' sampleCounts='+JSON.stringify(d.remux.sampleCounts)+' tracks='+Object.keys(trackMeta).length);
+
+        if(Object.keys(trackMeta).length===0){
+          d.remux.error='no tracks after onReady';
+          reject(new Error('no tracks')); return;
+        }
         buildFlatMp4(ab,trackMeta,allSamples,resolve,reject);
 
-      }catch(e){ reject(e); }
-    }).catch(reject);
+      }catch(e){
+        d.remux.error='exception:'+e.message;
+        console.log('[RC] remuxToMp4 exception:',e.message);
+        reject(e);
+      }
+    }).catch(e=>{
+      d.remux.error='arrayBuffer:'+e.message;
+      reject(e);
+    });
   });
 }
 
 // Mux extracted mp4box.js samples into a flat non-fragmented MP4 via mp4-muxer.
 // Extracted as a standalone function so remuxToMp4 stays readable.
 function buildFlatMp4(origAb,trackMeta,allSamples,resolve,reject){
+  const d=window._rcDiag||(window._rcDiag={});
   try{
     const videoId=Object.keys(trackMeta).find(id=>trackMeta[id].track.type==='video');
     const audioId=Object.keys(trackMeta).find(id=>trackMeta[id].track.type==='audio');
     const vMeta=videoId?trackMeta[videoId]:null;
     const aMeta=audioId?trackMeta[audioId]:null;
+    const vSamples=videoId?allSamples[videoId].length:0;
+    const aSamples=audioId?allSamples[audioId].length:0;
+    d.build={videoId,audioId,vSamples,aSamples};
+    console.log('[RC] buildFlatMp4 videoId='+videoId+' vSamples='+vSamples+' audioId='+audioId+' aSamples='+aSamples);
 
     // Guard: reject explicitly on 0 video samples — avoids silently producing an unplayable file
-    if(vMeta&&allSamples[videoId].length===0){ reject(new Error('no video samples')); return; }
+    if(vMeta&&vSamples===0){
+      d.build.error='no video samples';
+      reject(new Error('no video samples')); return;
+    }
 
-    const hasAudio=aMeta&&allSamples[audioId].length>0;
+    const hasAudio=aMeta&&aSamples>0;
     const mxOpts={
       target:new Mp4Muxer.ArrayBufferTarget(),
       fastStart:'in-memory',
@@ -1408,13 +1461,18 @@ function buildFlatMp4(origAb,trackMeta,allSamples,resolve,reject){
     };
     if(vMeta) mxOpts.video={codec:'avc',width:vMeta.track.video.width,height:vMeta.track.video.height};
     if(hasAudio) mxOpts.audio={codec:'aac',numberOfChannels:aMeta.track.audio.channel_count,sampleRate:aMeta.track.audio.sample_rate};
+    d.build.mxOpts={video:mxOpts.video,audio:mxOpts.audio};
+    console.log('[RC] mp4-muxer opts: '+JSON.stringify(d.build.mxOpts));
 
     const muxer=new Mp4Muxer.Muxer(mxOpts);
 
     if(vMeta){
       // avcC decoder config record: raw bytes after the box header (hdr_size = 8 for standard box)
       const c=vMeta.entry.avcC;
+      if(!c){ d.build.error='no avcC on video entry'; reject(new Error('no avcC')); return; }
       const desc=origAb.slice(c.start+c.hdr_size,c.start+c.size);
+      d.build.avcCSize=desc.byteLength;
+      console.log('[RC] avcC desc size='+desc.byteLength);
       const ts=vMeta.track.timescale;
       allSamples[videoId].forEach((s,i)=>muxer.addVideoChunkRaw(
         s.data,s.is_sync?'key':'delta',
@@ -1428,17 +1486,22 @@ function buildFlatMp4(origAb,trackMeta,allSamples,resolve,reject){
       // Falls back to computing it from sample rate + channel count if esds structure differs
       // (iOS Safari may nest descriptors differently than Chrome).
       let asc;
+      let ascSource='esds';
       try{
-        const d=aMeta.entry.esds.esd.descs[0].descs[0].data;
-        asc=new Uint8Array(Object.keys(d).length);
-        for(let i=0;i<asc.length;i++) asc[i]=d[i];
-      }catch(_){
+        const ed=aMeta.entry.esds.esd.descs[0].descs[0].data;
+        asc=new Uint8Array(Object.keys(ed).length);
+        for(let i=0;i<asc.length;i++) asc[i]=ed[i];
+      }catch(esdsErr){
+        ascSource='computed('+esdsErr.message+')';
         // AAC-LC objectType=2, sampleRateIndex from standard table, then channelCount
         const srIdx=[96000,88200,64000,48000,44100,32000,24000,22050,16000,12000,11025,8000,7350]
           .indexOf(aMeta.track.audio.sample_rate);
         const w=(2<<11)|(Math.max(0,srIdx)<<7)|(aMeta.track.audio.channel_count<<3);
         asc=new Uint8Array([(w>>8)&0xFF,w&0xFF]);
       }
+      d.build.ascSource=ascSource;
+      d.build.ascHex=Array.from(asc).map(b=>b.toString(16).padStart(2,'0')).join('');
+      console.log('[RC] ASC source='+ascSource+' hex='+d.build.ascHex);
       const ts=aMeta.track.timescale;
       allSamples[audioId].forEach((s,i)=>muxer.addAudioChunkRaw(
         s.data,'key',
@@ -1448,13 +1511,23 @@ function buildFlatMp4(origAb,trackMeta,allSamples,resolve,reject){
       ));
     }
     muxer.finalize();
-    resolve(new Blob([muxer.target.buffer],{type:'video/mp4'}));
-  }catch(e){ reject(e); }
+    const outBuf=muxer.target.buffer;
+    d.build.outputSize=outBuf.byteLength;
+    console.log('[RC] muxer.finalize() outputSize='+outBuf.byteLength);
+    resolve(new Blob([outBuf],{type:'video/mp4'}));
+  }catch(e){
+    d.build=(d.build||{});
+    d.build.error='exception:'+e.message;
+    console.log('[RC] buildFlatMp4 exception:',e.message,e.stack);
+    reject(e);
+  }
 }
 
 async function processVideoInBackground(){
   if(processingStarted) return; // once-gate: prevents 5s fallback + 30s guard from double-invoking
   processingStarted=true;
+  // Diagnostics object — inspect via `_rcDiag` in Safari Web Inspector console
+  window._rcDiag={build:APP_BUILD,ua:navigator.userAgent,chunks:chunks.length,nativeMp4};
   if(chunks.length===0){
     uploadFailed=true;
     clearTimeout(processingGuard);
@@ -1465,16 +1538,30 @@ async function processVideoInBackground(){
   uploadFailed=false;
   // mime is function-scoped inside startRecording() — use nativeMp4 (implicit global) instead
   finalBlob=new Blob(chunks,{type:nativeMp4?'video/mp4':'video/webm'});
+  window._rcDiag.finalBlobSize=finalBlob.size;
+  // Sniff first 12 bytes of finalBlob to detect actual container format
+  const _hdr=new Uint8Array(await finalBlob.slice(0,12).arrayBuffer());
+  const _boxType=String.fromCharCode(_hdr[4],_hdr[5],_hdr[6],_hdr[7]);
+  window._rcDiag.headerHex=Array.from(_hdr).map(b=>b.toString(16).padStart(2,'0')).join(' ');
+  window._rcDiag.firstBoxType=_boxType;
+  console.log('[RC] finalBlob size='+finalBlob.size+' chunks='+chunks.length+' firstBox='+_boxType+' hex='+window._rcDiag.headerHex);
   const isOnDone=()=>document.getElementById('done-screen').classList.contains('active');
 
   if(nativeMp4){
     // fMP4 → standard MP4 via mp4box.js remux (local, ~1-2s, no server)
+    window._rcDiag.Mp4MuxerAvailable=typeof window.Mp4Muxer;
+    console.log('[RC] Mp4Muxer='+typeof window.Mp4Muxer);
     setConv(30,'Processing…');
     const _timeout=new Promise((_,r)=>setTimeout(()=>r(new Error('remux timeout')),10000));
     try{
       mp4Blob=await Promise.race([remuxToMp4(finalBlob),_timeout]);
+      window._rcDiag.remuxResult='ok';
+      window._rcDiag.mp4BlobSize=mp4Blob.size;
+      console.log('[RC] remux OK mp4Blob.size='+mp4Blob.size);
     }catch(e){
-      mp4Blob=finalBlob; // fallback: raw fMP4 (playable in most apps except WhatsApp)
+      window._rcDiag.remuxResult='fail:'+e.message;
+      console.log('[RC] remux FAILED:',e.message,'— falling back to finalBlob');
+      mp4Blob=finalBlob; // fallback: raw recording
     }
   } else {
     // WebM (Opus audio): no practical client-side transcode to AAC — download only
@@ -1482,6 +1569,8 @@ async function processVideoInBackground(){
   }
 
   clearTimeout(processingGuard);
+  // Final summary — copy this entire line from Safari Web Inspector console
+  console.log('[RC:DIAG] '+JSON.stringify(window._rcDiag));
   if(isOnDone()) enableDownloadButton();
 }
 

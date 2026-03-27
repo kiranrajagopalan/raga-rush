@@ -514,7 +514,7 @@ function modeLabel(){ return {easy:'Easy',notSoEasy:'Not So Easy',surpriseMe:'Su
 // ── Feedback analytics endpoint (optional Google Sheets logger) ──
 // Setup: Extensions → Apps Script → paste doPost handler → Deploy as web app (Anyone) → paste URL here
 const SHEETS_ENDPOINT = 'https://script.google.com/macros/s/AKfycbx6S-nn5jBqF3ZaYACvM-Cq_7fn9WPv7Yhyikph3F_0QhZcp4Q6FHFK6DbGQ47FiGJ1/exec';
-const APP_BUILD = '20260328-b30'; // bump this on every push so Sheets confirms which build you're testing
+const APP_BUILD = '20260328-b31'; // bump this on every push so Sheets confirms which build you're testing
 const CLOUDINARY_CLOUD = 'dfstch1ag';
 const CLOUDINARY_PRESET = 'forRagaChallange';
 const CLOUDINARY_UPLOAD_URL = 'https://api.cloudinary.com/v1_1/dfstch1ag/video/upload';
@@ -833,9 +833,11 @@ function startRecording(){
   // iOS only supports MP4 recording; all others prefer WebM (Cloudinary handles WebM→MP4 perfectly).
   // Chrome's MP4 recording produces fMP4 which Cloudinary truncates to ~2s.
   const isIOS=/iPad|iPhone|iPod/.test(navigator.userAgent)||(navigator.platform==='MacIntel'&&navigator.maxTouchPoints>1);
-  // All browsers: prefer MP4 (H264+AAC) so we can client-side remux fMP4→flat MP4.
-  // WebM fallback for browsers that don't support MP4 recording (rare).
-  const mimes=['video/mp4;codecs=avc1,mp4a.40.2','video/mp4','video/webm;codecs=vp9,opus','video/webm;codecs=vp8,opus','video/webm'];
+  // iOS: prefer MP4 (only option). Others: prefer WebM (reliable VP9 video capture).
+  // Chrome Android lies about MP4 support on some devices (produces audio-only fMP4).
+  const mimes=isIOS
+    ? ['video/mp4;codecs=avc1,mp4a.40.2','video/mp4']
+    : ['video/webm;codecs=vp9,opus','video/webm;codecs=vp8,opus','video/webm','video/mp4;codecs=avc1,mp4a.40.2','video/mp4'];
   const mime=mimes.find(m=>MediaRecorder.isTypeSupported(m))||'video/webm';
   nativeMp4=mime.startsWith('video/mp4');
   // Halve bitrate on mobile — same quality at phone resolutions, significantly less encoder heat
@@ -1628,28 +1630,13 @@ async function processVideoInBackground(){
   const _isIOS=/iPad|iPhone|iPod/.test(navigator.userAgent)||(navigator.platform==='MacIntel'&&navigator.maxTouchPoints>1);
 
   try{
-    if(nativeMp4&&actuallyMp4&&!_isIOS){
-      // ── Path A: Client-side remux (Android/Desktop) ──
-      // MediaRecorder outputs fMP4 (fragmented). WhatsApp Android rejects fMP4 + High profile.
-      // Remux to flat MP4 locally using custom parser + mp4-muxer (~1-2s, no server).
-      setConv(30,'Processing\u2026');
-      window._rcDiag.pipeline='client-remux';
-      const _timeout=new Promise((_,r)=>setTimeout(()=>r(new Error('remux timeout')),15000));
-      mp4Blob=await Promise.race([remuxToFlatMp4(finalBlob),_timeout]);
-      window._rcDiag.mp4BlobSize=mp4Blob.size;
-      window._rcDiag.pipelineResult='ok';
-      console.log('[RC] remux OK size='+mp4Blob.size);
-    } else {
-      // ── Path B: Cloudinary (iOS + WebM fallback) ──
-      // iOS: WhatsApp iOS re-encodes all videos, so Cloudinary fMP4 output is fine.
-      // WebM: can't remux to MP4 client-side without re-encoding.
+    if(_isIOS){
+      // ── Path A: iOS → Cloudinary only ──
+      // WhatsApp iOS re-encodes all videos. Cloudinary fMP4 output is fine.
       setConv(5,'Uploading\u2026');
-      window._rcDiag.pipeline='cloudinary';
+      window._rcDiag.pipeline='ios-cloudinary';
       const uploadResult=await uploadToCloudinary(finalBlob);
-      window._rcDiag.uploadUrl=uploadResult.secure_url;
-      window._rcDiag.uploadBytes=uploadResult.bytes;
       if(uploadResult.delete_token) _cdDeleteToken=uploadResult.delete_token;
-      console.log('[RC] upload OK bytes='+uploadResult.bytes);
       setConv(80,'Converting\u2026');
       const mp4Url=uploadResult.secure_url.replace(/\/upload\//,'/upload/f_mp4,vc_h264,ac_aac,af_44100/').replace(/\.[^.]+$/,'.mp4');
       mp4DirectUrl=mp4Url;
@@ -1661,7 +1648,34 @@ async function processVideoInBackground(){
       clearTimeout(fetchTimer);
       window._rcDiag.mp4BlobSize=mp4Blob.size;
       window._rcDiag.pipelineResult='ok';
-      console.log('[RC] cloudinary OK size='+mp4Blob.size);
+    } else {
+      // ── Path B: Android/Desktop → Cloudinary + client-side remux ──
+      // Step 1: Upload WebM to Cloudinary (server-side VP9→H264 transcode)
+      setConv(5,'Uploading\u2026');
+      window._rcDiag.pipeline='cloud+remux';
+      const uploadResult=await uploadToCloudinary(finalBlob);
+      if(uploadResult.delete_token) _cdDeleteToken=uploadResult.delete_token;
+      console.log('[RC] upload OK bytes='+uploadResult.bytes);
+
+      // Step 2: Fetch Cloudinary's fMP4 output (H264+AAC but fragmented)
+      setConv(70,'Converting\u2026');
+      const mp4Url=uploadResult.secure_url.replace(/\/upload\//,'/upload/f_mp4,vc_h264,ac_aac,af_44100/').replace(/\.[^.]+$/,'.mp4');
+      mp4DirectUrl=mp4Url;
+      const fetchAbort=new AbortController();
+      const fetchTimer=setTimeout(()=>fetchAbort.abort(),40000);
+      const resp=await fetch(mp4Url,{signal:fetchAbort.signal});
+      if(!resp.ok) throw new Error('mp4 fetch HTTP '+resp.status);
+      const fmp4Blob=await resp.blob();
+      clearTimeout(fetchTimer);
+      console.log('[RC] cloudinary fMP4 size='+fmp4Blob.size);
+
+      // Step 3: Client-side remux fMP4 → flat MP4 (WhatsApp Android needs flat MP4)
+      setConv(85,'Optimising\u2026');
+      const _timeout=new Promise((_,r)=>setTimeout(()=>r(new Error('remux timeout')),15000));
+      mp4Blob=await Promise.race([remuxToFlatMp4(fmp4Blob),_timeout]);
+      window._rcDiag.mp4BlobSize=mp4Blob.size;
+      window._rcDiag.pipelineResult='ok';
+      console.log('[RC] remux OK size='+mp4Blob.size);
     }
   }catch(e){
     console.log('[RC] pipeline FAILED:',e.message);

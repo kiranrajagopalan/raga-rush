@@ -513,7 +513,7 @@ function modeLabel(){ return {easy:'Easy',notSoEasy:'Not So Easy',surpriseMe:'Su
 // ── Feedback analytics endpoint (optional Google Sheets logger) ──
 // Setup: Extensions → Apps Script → paste doPost handler → Deploy as web app (Anyone) → paste URL here
 const SHEETS_ENDPOINT = 'https://script.google.com/macros/s/AKfycbx6S-nn5jBqF3ZaYACvM-Cq_7fn9WPv7Yhyikph3F_0QhZcp4Q6FHFK6DbGQ47FiGJ1/exec';
-const APP_BUILD = '20260327-b4'; // bump this on every push so Sheets confirms which build you're testing
+const APP_BUILD = '20260327-b5'; // bump this on every push so Sheets confirms which build you're testing
 
 let difficulty='easy', timePerRaga=8, ragaCount=10;
 let lastSurpriseThemeIdx=-1, activeTheme=null;
@@ -1361,16 +1361,9 @@ async function processVideoInBackground(){
   }
   uploadFailed=false;
 
-  // Native MP4 path (Safari/iOS) — no Cloudinary needed
-  if(nativeMp4){
-    finalBlob=new Blob(chunks,{type:'video/mp4'});
-    mp4Blob=finalBlob;
-    const isOnDone=()=>document.getElementById('done-screen').classList.contains('active');
-    if(isOnDone()) enableDownloadButton();
-    return;
-  }
-
-  finalBlob=new Blob(chunks,{type:'video/webm'});
+  // Always go through Cloudinary — raw MediaRecorder output (fMP4 or WebM) is not
+  // reliably playable in WhatsApp/social apps. Cloudinary outputs standard muxed MP4.
+  finalBlob=new Blob(chunks,{type:mime});
 
   const isOnDone=()=>document.getElementById('done-screen').classList.contains('active');
 
@@ -1382,7 +1375,7 @@ async function processVideoInBackground(){
 
   try{
     const fd=new FormData();
-    fd.append('file', finalBlob, 'raga.webm');
+    fd.append('file', finalBlob, nativeMp4 ? 'raga.mp4' : 'raga.webm');
     fd.append('upload_preset', CLOUDINARY_PRESET);
 
     const xhr=new XMLHttpRequest();

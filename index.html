@@ -514,7 +514,7 @@ function modeLabel(){ return {easy:'Easy',notSoEasy:'Not So Easy',surpriseMe:'Su
 // ── Feedback analytics endpoint (optional Google Sheets logger) ──
 // Setup: Extensions → Apps Script → paste doPost handler → Deploy as web app (Anyone) → paste URL here
 const SHEETS_ENDPOINT = 'https://script.google.com/macros/s/AKfycbx6S-nn5jBqF3ZaYACvM-Cq_7fn9WPv7Yhyikph3F_0QhZcp4Q6FHFK6DbGQ47FiGJ1/exec';
-const APP_BUILD = '20260328-b27'; // bump this on every push so Sheets confirms which build you're testing
+const APP_BUILD = '20260328-b28'; // bump this on every push so Sheets confirms which build you're testing
 const CLOUDINARY_CLOUD = 'dfstch1ag';
 const CLOUDINARY_PRESET = 'forRagaChallange';
 const CLOUDINARY_UPLOAD_URL = 'https://api.cloudinary.com/v1_1/dfstch1ag/video/upload';
@@ -1352,8 +1352,9 @@ function enableDownloadButton(){
   const d=window._rcDiag||{};
   const sizeMB=d.mp4BlobSize?((d.mp4BlobSize/1048576).toFixed(1)+'MB'):'?';
   const pipe=d.pipeline||'?';
+  const hdr=(d.blobHeader||'').substring(0,23); // first 8 bytes
   const diag=document.getElementById('rc-diag');
-  if(diag) diag.textContent=APP_BUILD+' | '+sizeMB+' | '+pipe+' | '+((d.pipelineResult)||'?');
+  if(diag) diag.textContent=APP_BUILD+' | '+sizeMB+' | '+pipe+' | hdr:'+hdr+' | '+((d.pipelineResult)||'?');
 }
 
 
@@ -1482,6 +1483,21 @@ function remuxToFlatMp4(fmp4Blob){
       tracks[tid]=info;
     }
 
+    // Parse trex defaults from moov/mvex
+    const trexDefaults={};
+    const mvex=findBox(kids(moov),'mvex');
+    if(mvex){
+      for(const trex of kids(mvex).filter(b=>b.t==='trex')){
+        const trexTid=dv.getUint32(trex.o+12);
+        trexDefaults[trexTid]={
+          dur:dv.getUint32(trex.o+20),
+          sz:dv.getUint32(trex.o+24),
+          fl:dv.getUint32(trex.o+28)
+        };
+      }
+    }
+    console.log('[RC] trex defaults:',JSON.stringify(trexDefaults));
+
     // Parse moof+mdat pairs for samples
     const samples={};
     for(const tid in tracks) samples[tid]=[];
@@ -1502,9 +1518,11 @@ function remuxToFlatMp4(fmp4Blob){
         const tfFlags=(u8[tfhd.o+9]<<16)|(u8[tfhd.o+10]<<8)|u8[tfhd.o+11];
         const tfTid=dv.getUint32(tfhd.o+12);
         let fp=tfhd.o+16;
-        if(tfFlags&0x01) fp+=8; // base_data_offset
-        if(tfFlags&0x02) fp+=4; // sample_description_index
-        let defDur=0,defSz=0,defFl=0;
+        if(tfFlags&0x01) fp+=8;
+        if(tfFlags&0x02) fp+=4;
+        // Start with trex defaults, then override with tfhd
+        const tx=trexDefaults[tfTid]||{dur:0,sz:0,fl:0};
+        let defDur=tx.dur,defSz=tx.sz,defFl=tx.fl;
         if(tfFlags&0x08){defDur=dv.getUint32(fp);fp+=4;}
         if(tfFlags&0x10){defSz=dv.getUint32(fp);fp+=4;}
         if(tfFlags&0x20){defFl=dv.getUint32(fp);fp+=4;}
@@ -1518,7 +1536,9 @@ function remuxToFlatMp4(fmp4Blob){
         let firstFlags=0;
         if(trFlags&0x04){firstFlags=dv.getUint32(tp);tp+=4;}
 
-        let sOff=moofOff+dataOff; // data_offset relative to moof start
+        console.log('[RC] trun: tid='+tfTid+' count='+count+' trFlags=0x'+trFlags.toString(16)+' tfFlags=0x'+tfFlags.toString(16)+' defSz='+defSz+' dataOff='+dataOff);
+
+        let sOff=moofOff+dataOff;
         for(let s=0;s<count;s++){
           let dur=defDur,sz=defSz,fl=defFl,cts=0;
           if(trFlags&0x100){dur=dv.getUint32(tp);tp+=4;}
@@ -1527,7 +1547,8 @@ function remuxToFlatMp4(fmp4Blob){
           if(trFlags&0x800){cts=dv.getInt32(tp);tp+=4;}
           if(s===0&&(trFlags&0x04)) fl=firstFlags;
           const isSync=!(fl&0x10000);
-          if(sz>0&&sOff+sz<=ab.byteLength){
+          if(sz>0&&sOff>=0&&sOff+sz<=ab.byteLength){
+            if(!samples[tfTid]) samples[tfTid]=[];
             samples[tfTid].push({data:new Uint8Array(ab,sOff,sz),dur,isSync,cts});
           }
           sOff+=sz;
@@ -1588,11 +1609,17 @@ async function processVideoInBackground(){
   uploadFailed=false;
   finalBlob=new Blob(chunks,{type:nativeMp4?'video/mp4':'video/webm'});
   window._rcDiag.finalBlobSize=finalBlob.size;
-  console.log('[RC] finalBlob size='+finalBlob.size+' chunks='+chunks.length+' nativeMp4='+nativeMp4);
+  // Detect actual format from first bytes (Chrome may lie about MP4 support)
+  const hdr=new Uint8Array(await finalBlob.slice(0,12).arrayBuffer());
+  const hdrHex=Array.from(hdr).map(b=>b.toString(16).padStart(2,'0')).join(' ');
+  window._rcDiag.blobHeader=hdrHex;
+  const actuallyMp4=hdrHex.includes('66 74 79 70'); // 'ftyp' marker
+  const actuallyWebm=(hdr[0]===0x1a&&hdr[1]===0x45&&hdr[2]===0xdf&&hdr[3]===0xa3);
+  console.log('[RC] finalBlob size='+finalBlob.size+' chunks='+chunks.length+' nativeMp4='+nativeMp4+' actuallyMp4='+actuallyMp4+' hdr='+hdrHex);
   const isOnDone=()=>document.getElementById('done-screen').classList.contains('active');
 
   try{
-    if(nativeMp4){
+    if(nativeMp4&&actuallyMp4){
       // ── Path A: Client-side remux (Chrome/Android/Desktop) ──
       // MediaRecorder outputs fMP4 (fragmented). WhatsApp Android rejects fMP4.
       // Remux to flat MP4 locally using mp4box.js + mp4-muxer (~1-2s, no server).

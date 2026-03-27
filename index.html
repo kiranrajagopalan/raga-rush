@@ -513,7 +513,7 @@ function modeLabel(){ return {easy:'Easy',notSoEasy:'Not So Easy',surpriseMe:'Su
 // ── Feedback analytics endpoint (optional Google Sheets logger) ──
 // Setup: Extensions → Apps Script → paste doPost handler → Deploy as web app (Anyone) → paste URL here
 const SHEETS_ENDPOINT = 'https://script.google.com/macros/s/AKfycbx6S-nn5jBqF3ZaYACvM-Cq_7fn9WPv7Yhyikph3F_0QhZcp4Q6FHFK6DbGQ47FiGJ1/exec';
-const APP_BUILD = '20260328-b33'; // bump this on every push so Sheets confirms which build you're testing
+const APP_BUILD = '20260328-b34'; // bump this on every push so Sheets confirms which build you're testing
 const CLOUDINARY_CLOUD = 'dfstch1ag';
 const CLOUDINARY_PRESET = 'forRagaChallange';
 const CLOUDINARY_UPLOAD_URL = 'https://api.cloudinary.com/v1_1/dfstch1ag/video/upload';
@@ -1565,17 +1565,8 @@ function remuxToFlatMp4(fmp4Blob){
       throw new Error('remux:0vSamp '+detail);
     }
 
-    // Sort video samples by presentation time (B-frames cause out-of-order PTS)
-    let vDts=0;
-    const vOrdered=vSamp.map(s=>{
-      const pts=vDts+s.cts;
-      const r={data:s.data,dur:s.dur,isSync:s.isSync,pts};
-      vDts+=s.dur;
-      return r;
-    });
-    vOrdered.sort((a,b)=>a.pts-b.pts);
-
     // Mux to flat MP4 via mp4-muxer
+    // Cloudinary encodes with baseline profile (no B-frames), so PTS=DTS — no sorting needed.
     const vT=tracks[vId];
     const aT=aId?tracks[aId]:null;
     const opts={target:new Mp4Muxer.ArrayBufferTarget(),fastStart:'in-memory',firstTimestampBehavior:'offset'};
@@ -1583,13 +1574,13 @@ function remuxToFlatMp4(fmp4Blob){
     if(aT&&aSamp.length>0) opts.audio={codec:'aac',numberOfChannels:aT.ch,sampleRate:aT.sr};
 
     const mux=new Mp4Muxer.Muxer(opts);
-    let cfgSent=false;
-    vOrdered.forEach(s=>{
+    let vTime=0;
+    vSamp.forEach((s,i)=>{
       const ts=vT.timescale;
-      const meta=(!cfgSent&&s.isSync)?{decoderConfig:{description:vT.codecData}}:undefined;
-      if(meta) cfgSent=true;
       mux.addVideoChunkRaw(s.data,s.isSync?'key':'delta',
-        Math.round((s.pts/ts)*1e6),Math.round((s.dur/ts)*1e6),meta);
+        Math.round((vTime/ts)*1e6),Math.round((s.dur/ts)*1e6),
+        i===0?{decoderConfig:{description:vT.codecData}}:undefined);
+      vTime+=s.dur;
     });
     if(aT&&aSamp.length>0){
       let aTime=0;
@@ -1641,7 +1632,7 @@ async function processVideoInBackground(){
       const uploadResult=await uploadToCloudinary(finalBlob);
       if(uploadResult.delete_token) _cdDeleteToken=uploadResult.delete_token;
       setConv(80,'Converting\u2026');
-      const mp4Url=uploadResult.secure_url.replace(/\/upload\//,'/upload/f_mp4,vc_h264,ac_aac,af_44100,br_4m/').replace(/\.[^.]+$/,'.mp4');
+      const mp4Url=uploadResult.secure_url.replace(/\/upload\//,'/upload/f_mp4,vc_h264:baseline:3.1,ac_aac,af_44100,br_4m/').replace(/\.[^.]+$/,'.mp4');
       mp4DirectUrl=mp4Url;
       const fetchAbort=new AbortController();
       const fetchTimer=setTimeout(()=>fetchAbort.abort(),40000);
@@ -1662,7 +1653,7 @@ async function processVideoInBackground(){
 
       // Step 2: Fetch Cloudinary's fMP4 output (H264+AAC but fragmented)
       setConv(70,'Converting\u2026');
-      const mp4Url=uploadResult.secure_url.replace(/\/upload\//,'/upload/f_mp4,vc_h264,ac_aac,af_44100,br_4m/').replace(/\.[^.]+$/,'.mp4');
+      const mp4Url=uploadResult.secure_url.replace(/\/upload\//,'/upload/f_mp4,vc_h264:baseline:3.1,ac_aac,af_44100,br_4m/').replace(/\.[^.]+$/,'.mp4');
       mp4DirectUrl=mp4Url;
       const fetchAbort=new AbortController();
       const fetchTimer=setTimeout(()=>fetchAbort.abort(),40000);

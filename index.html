@@ -514,7 +514,7 @@ function modeLabel(){ return {easy:'Easy',notSoEasy:'Not So Easy',surpriseMe:'Su
 // ── Feedback analytics endpoint (optional Google Sheets logger) ──
 // Setup: Extensions → Apps Script → paste doPost handler → Deploy as web app (Anyone) → paste URL here
 const SHEETS_ENDPOINT = 'https://script.google.com/macros/s/AKfycbx6S-nn5jBqF3ZaYACvM-Cq_7fn9WPv7Yhyikph3F_0QhZcp4Q6FHFK6DbGQ47FiGJ1/exec';
-const APP_BUILD = '20260328-b28'; // bump this on every push so Sheets confirms which build you're testing
+const APP_BUILD = '20260328-b29'; // bump this on every push so Sheets confirms which build you're testing
 const CLOUDINARY_CLOUD = 'dfstch1ag';
 const CLOUDINARY_PRESET = 'forRagaChallange';
 const CLOUDINARY_UPLOAD_URL = 'https://api.cloudinary.com/v1_1/dfstch1ag/video/upload';
@@ -1352,9 +1352,8 @@ function enableDownloadButton(){
   const d=window._rcDiag||{};
   const sizeMB=d.mp4BlobSize?((d.mp4BlobSize/1048576).toFixed(1)+'MB'):'?';
   const pipe=d.pipeline||'?';
-  const hdr=(d.blobHeader||'').substring(0,23); // first 8 bytes
   const diag=document.getElementById('rc-diag');
-  if(diag) diag.textContent=APP_BUILD+' | '+sizeMB+' | '+pipe+' | hdr:'+hdr+' | '+((d.pipelineResult)||'?');
+  if(diag) diag.textContent=APP_BUILD+' | '+sizeMB+' | '+pipe+' | '+((d.pipelineResult)||'?');
 }
 
 
@@ -1557,12 +1556,19 @@ function remuxToFlatMp4(fmp4Blob){
     }
 
     // Log what we found
+    const trkInfo=Object.values(tracks).map(t=>t.id+':'+t.type+'('+t.w+'x'+t.h+')ts='+t.timescale+',cd='+(t.codecData?t.codecData.length:0));
+    const allSampCounts=Object.keys(samples).map(id=>id+':'+samples[id].length);
     const vId=Object.keys(tracks).find(id=>tracks[id].type==='video');
     const aId=Object.keys(tracks).find(id=>tracks[id].type==='audio');
     const vSamp=vId?samples[vId]:[];
     const aSamp=aId?samples[aId]:[];
-    console.log('[RC] fMP4 parsed: tracks='+Object.keys(tracks).length+' vSamples='+vSamp.length+' aSamples='+aSamp.length);
-    if(vSamp.length===0) throw new Error('remux: 0 video samples ('+Object.keys(tracks).length+' tracks, moofs='+top.filter(b=>b.t==='moof').length+')');
+    // Store comprehensive diagnostics
+    window._rcDiag.fmp4={trk:trkInfo,samp:allSampCounts,moofs:top.filter(b=>b.t==='moof').length,trex:JSON.stringify(trexDefaults)};
+    console.log('[RC] fMP4 parsed: tracks=['+trkInfo+'] samples=['+allSampCounts+']');
+    if(vSamp.length===0){
+      const detail='trk=['+trkInfo+'] samp=['+allSampCounts+'] moofs='+top.filter(b=>b.t==='moof').length+' trex='+JSON.stringify(trexDefaults);
+      throw new Error('remux:0vSamp '+detail);
+    }
 
     // Mux to flat MP4 via mp4-muxer
     const vT=tracks[vId];

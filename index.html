@@ -512,7 +512,7 @@ function modeLabel(){ return {easy:'Easy',notSoEasy:'Not So Easy',surpriseMe:'Su
 // ── Feedback analytics endpoint (optional Google Sheets logger) ──
 // Setup: Extensions → Apps Script → paste doPost handler → Deploy as web app (Anyone) → paste URL here
 const SHEETS_ENDPOINT = 'https://script.google.com/macros/s/AKfycbx6S-nn5jBqF3ZaYACvM-Cq_7fn9WPv7Yhyikph3F_0QhZcp4Q6FHFK6DbGQ47FiGJ1/exec';
-const APP_BUILD = '20260328-b17'; // bump this on every push so Sheets confirms which build you're testing
+const APP_BUILD = '20260328-b18'; // bump this on every push so Sheets confirms which build you're testing
 const CLOUDINARY_CLOUD = 'dfstch1ag';
 const CLOUDINARY_PRESET = 'forRagaChallange';
 const CLOUDINARY_UPLOAD_URL = 'https://api.cloudinary.com/v1_1/dfstch1ag/video/upload';
@@ -828,7 +828,12 @@ function startRecording(){
   const cs=audioTracks.length>0
     ? new MediaStream([...videoStream.getVideoTracks(),...audioTracks])
     : videoStream;
-  const mimes=['video/mp4;codecs=avc1,mp4a.40.2','video/mp4','video/webm;codecs=vp9,opus','video/webm;codecs=vp8,opus','video/webm'];
+  // iOS only supports MP4 recording; all others prefer WebM (Cloudinary handles WebM→MP4 perfectly).
+  // Chrome's MP4 recording produces fMP4 which Cloudinary truncates to ~2s.
+  const isIOS=/iPad|iPhone|iPod/.test(navigator.userAgent)||(navigator.platform==='MacIntel'&&navigator.maxTouchPoints>1);
+  const mimes=isIOS
+    ? ['video/mp4;codecs=avc1,mp4a.40.2','video/mp4']
+    : ['video/webm;codecs=vp9,opus','video/webm;codecs=vp8,opus','video/webm','video/mp4;codecs=avc1,mp4a.40.2','video/mp4'];
   const mime=mimes.find(m=>MediaRecorder.isTypeSupported(m))||'video/webm';
   nativeMp4=mime.startsWith('video/mp4');
   // Halve bitrate on mobile — same quality at phone resolutions, significantly less encoder heat
@@ -1350,8 +1355,6 @@ function uploadToCloudinary(blob){
     const fd=new FormData();
     fd.append('file',blob,'raga-challenge.'+(nativeMp4?'mp4':'webm'));
     fd.append('upload_preset',CLOUDINARY_PRESET);
-    // Eager: convert to flat MP4 at upload time (not fetch time) — more reliable
-    fd.append('eager','f_mp4,vc_h264,ac_aac');
     const xhr=new XMLHttpRequest();
     xhr.open('POST',CLOUDINARY_UPLOAD_URL);
     xhr.upload.onprogress=e=>{
@@ -1414,13 +1417,8 @@ async function processVideoInBackground(){
     console.log('[RC] upload OK bytes='+uploadResult.bytes);
 
     // Phase 2: Fetch converted flat MP4 back
-    // Use eager result URL (processed at upload time) — falls back to URL transform if eager missing
     setConv(80,'Converting\u2026');
-    const mp4Url=(uploadResult.eager&&uploadResult.eager[0]&&uploadResult.eager[0].secure_url)
-      ? uploadResult.eager[0].secure_url
-      : uploadResult.secure_url.replace('/upload/','/upload/f_mp4,vc_h264,ac_aac/');
-    window._rcDiag.mp4Url=mp4Url;
-    window._rcDiag.eagerAvail=!!(uploadResult.eager&&uploadResult.eager[0]);
+    const mp4Url=uploadResult.secure_url.replace('/upload/','/upload/f_mp4/');
     const resp=await fetch(mp4Url);
     if(!resp.ok) throw new Error('mp4 fetch HTTP '+resp.status);
     mp4Blob=await resp.blob();

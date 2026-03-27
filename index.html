@@ -513,7 +513,7 @@ function modeLabel(){ return {easy:'Easy',notSoEasy:'Not So Easy',surpriseMe:'Su
 // ── Feedback analytics endpoint (optional Google Sheets logger) ──
 // Setup: Extensions → Apps Script → paste doPost handler → Deploy as web app (Anyone) → paste URL here
 const SHEETS_ENDPOINT = 'https://script.google.com/macros/s/AKfycbx6S-nn5jBqF3ZaYACvM-Cq_7fn9WPv7Yhyikph3F_0QhZcp4Q6FHFK6DbGQ47FiGJ1/exec';
-const APP_BUILD = '20260327-b7'; // bump this on every push so Sheets confirms which build you're testing
+const APP_BUILD = '20260327-b8'; // bump this on every push so Sheets confirms which build you're testing
 
 let difficulty='easy', timePerRaga=8, ragaCount=10;
 let lastSurpriseThemeIdx=-1, activeTheme=null;
@@ -1437,50 +1437,54 @@ async function shareOrDownload(){
   const btn=document.getElementById('dl-btn');
   if(btn._sharing) return; // prevent concurrent calls (second tap while share sheet is open)
   btn._sharing=true;
-
-  // Only share MP4 — WebM (Opus audio) is silent on WhatsApp/Android.
-  // mp4Blob is null for WebM devices (no client-side transcode available) → download only.
-  const blob=mp4Blob;
-  if(!blob){
-    // No MP4 available (older device recording WebM) — download the raw file
-    const webmBlob=finalBlob;
-    if(!webmBlob){ btn._sharing=false; alert('No recording found.'); return; }
-    const url=URL.createObjectURL(webmBlob);
-    const a=document.createElement('a'); a.href=url;
-    a.download='raga-challenge-'+difficulty+'-'+Date.now()+'.webm'; a.click();
-    setTimeout(()=>URL.revokeObjectURL(url),2000);
-    if(!fbShared){ fbShared=true; showFeedbackProminent(); }
-    btn._sharing=false; return;
-  }
-  const filename='raga-challenge-'+difficulty+'-'+Date.now()+'.mp4';
-  // blob.slice(0) forces a fresh Blob copy — avoids iOS WebKit blob-reuse issue
-  // where the same Blob reference on a second share falls through to download
-  const file=new File([blob.slice(0)], filename, {type:'video/mp4'});
-
-  // Try Web Share API (works on mobile Safari + Android Chrome)
-  if(navigator.canShare && navigator.canShare({files:[file]})){
-    try{
-      await navigator.share({
-        files:[file],
-        title:'My Raga Challenge',
-        text:'I just completed a Carnatic Raga Challenge! #RagaChallenge #Carnatic'
-      });
+  try{
+    // Only share MP4 — WebM (Opus audio) is silent on WhatsApp/Android.
+    // mp4Blob is null for WebM devices (no client-side transcode available) → download only.
+    const blob=mp4Blob;
+    if(!blob){
+      // No MP4 available (older device recording WebM) — download the raw file
+      const webmBlob=finalBlob;
+      if(!webmBlob){ alert('No recording found.'); return; }
+      const url=URL.createObjectURL(webmBlob);
+      const a=document.createElement('a'); a.href=url;
+      a.download='raga-challenge-'+difficulty+'-'+Date.now()+'.webm'; a.click();
+      setTimeout(()=>URL.revokeObjectURL(url),2000);
       if(!fbShared){ fbShared=true; showFeedbackProminent(); }
-      btn._sharing=false; return;
-    }catch(e){
-      btn._sharing=false;
-      if(e.name==='AbortError') return; // user cancelled share sheet
-      // other errors (NotAllowedError etc.) fall through to download
+      return;
     }
-  }
+    const filename='raga-challenge-'+difficulty+'-'+Date.now()+'.mp4';
+    // blob.slice(0) forces a fresh Blob copy — avoids iOS WebKit blob-reuse issue
+    // where the same Blob reference on a second share falls through to download
+    const file=new File([blob.slice(0)], filename, {type:'video/mp4'});
 
-  // Fallback: plain download (MP4)
-  const url=URL.createObjectURL(blob);
-  const a=document.createElement('a'); a.href=url;
-  a.download=filename; a.click();
-  setTimeout(()=>URL.revokeObjectURL(url),2000);
-  if(!fbShared){ fbShared=true; showFeedbackProminent(); }
-  btn._sharing=false;
+    // Try Web Share API (works on mobile Safari + Android Chrome)
+    let shared=false;
+    if(navigator.canShare && navigator.canShare({files:[file]})){
+      try{
+        await navigator.share({
+          files:[file],
+          title:'My Raga Challenge',
+          text:'I just completed a Carnatic Raga Challenge! #RagaChallenge #Carnatic'
+        });
+        shared=true;
+      }catch(e){
+        if(e.name==='AbortError') return; // user cancelled — don't download either
+        // other errors (NotAllowedError etc.) fall through to download below
+      }
+    }
+
+    if(!shared){
+      // Fallback: plain download (MP4)
+      const url=URL.createObjectURL(blob);
+      const a=document.createElement('a'); a.href=url;
+      a.download=filename; a.click();
+      setTimeout(()=>URL.revokeObjectURL(url),2000);
+    }
+
+    if(!fbShared){ fbShared=true; showFeedbackProminent(); }
+  }finally{
+    btn._sharing=false; // always unlock — even if an unexpected error occurs
+  }
 }
 
 // ── Feedback functions ──

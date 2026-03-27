@@ -510,6 +510,7 @@ function modeLabel(){ return {easy:'Easy',notSoEasy:'Not So Easy',surpriseMe:'Su
 // ── Feedback analytics endpoint (optional Google Sheets logger) ──
 // Setup: Extensions → Apps Script → paste doPost handler → Deploy as web app (Anyone) → paste URL here
 const SHEETS_ENDPOINT = 'https://script.google.com/macros/s/AKfycbxxePj6LXD2l7eEhop971eMQHoMTUaijBhvfKzQY_tozGRIp4HrXnXUlZaa_thxqFg/exec';
+const APP_BUILD = '20260327-b2'; // bump this on every push so Sheets confirms which build you're testing
 
 let difficulty='easy', timePerRaga=8, ragaCount=10;
 let lastSurpriseThemeIdx=-1, activeTheme=null;
@@ -524,6 +525,7 @@ let _cdDeleteToken=null; // kept private — not on window
 let countdownActive=false, countdownText='';
 let challengeElapsed=0, mp4Blob=null, uploadFailed=false, nativeMp4=false;
 let processingGuard=null; // safety timer — rescues "Preparing…" if all else fails
+let captureHeartbeat=null; // setInterval handle — keeps H264 encoder fed on Android Chrome
 let endCardActive=false, endCardStart=0;
 let slotOffset=0, cachedGrads={}, lastDrawTime=0;
 let slotSpinning=false, ragaRevealAt=0, ragaRevealName='';
@@ -830,6 +832,15 @@ function startRecording(){
   sessionPlayCount++; localStorage.setItem('rc_play_count', sessionPlayCount);
   sessionId='rc_'+Date.now().toString(36)+'_'+Math.random().toString(36).slice(2,6);
   mediaRecorder.start(100); startTime=Date.now();
+  // Heartbeat: push canvas state at 30 fps via setInterval, independent of rAF.
+  // Android Chrome's H264 hardware encoder requires a steady frame stream to
+  // initialise its keyframe interval — without this, captureStream(0) + rAF-only
+  // requestFrame() calls can leave the encoder in a partial state where stop()
+  // never flushes and onstop never fires.  When rAF is running normally the
+  // heartbeat and drawLoop both call requestFrame(); the extra calls are no-ops
+  // (encoder captures one frame per interval regardless).
+  clearInterval(captureHeartbeat);
+  captureHeartbeat=setInterval(()=>captureTrack?.requestFrame?.(), DRAW_INTERVAL);
   // Pause/resume MediaRecorder on visibility change — prevents audio/video desync
   // when Android dims the screen (rAF pauses but audio track keeps running)
   const onVisChange=()=>{
@@ -1179,11 +1190,11 @@ function drawLoop(video,W,H,dpr=1){
 function stopRecording(onStopped){
   if(!isRecording){ onStopped&&onStopped(); return; }
   drawRunning=false; isRecording=false;
-  captureTrack=null; // release frame-capture reference
   document.getElementById('rec-badge').classList.remove('visible');
+  clearInterval(captureHeartbeat); captureHeartbeat=null;
+  captureTrack?.requestFrame?.(); // flush final canvas frame before encoder closes
+  captureTrack=null;
   mediaRecorder.onstop=()=>{ onStopped&&onStopped(); };
-  // Resume before stopping — calling stop() on a paused recorder may not fire onstop
-  // on some Android Chrome versions (e.g. if screen dimmed mid-recording)
   if(mediaRecorder.state==='paused') mediaRecorder.resume();
   mediaRecorder.stop();
 }
@@ -1303,6 +1314,7 @@ function logSession(){
       screen_size:screen.width+'x'+screen.height,
       timezone:Intl.DateTimeFormat().resolvedOptions().timeZone,
       connection:navigator.connection?.effectiveType||'',
+      build:APP_BUILD,
     })
   }); }catch(e){}
 }
@@ -1614,6 +1626,7 @@ async function inviteFriend(){
 
 function restart(){
   clearTimeout(processingGuard);
+  clearInterval(captureHeartbeat); captureHeartbeat=null;
   if(mediaStream){ mediaStream.getTracks().forEach(t=>t.stop()); mediaStream=null; }
   document.getElementById('preview-video').srcObject=null;
   document.getElementById('video-bg').srcObject=null;

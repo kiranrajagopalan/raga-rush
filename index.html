@@ -514,7 +514,7 @@ function modeLabel(){ return {easy:'Easy',notSoEasy:'Not So Easy',surpriseMe:'Su
 // ── Feedback analytics endpoint (optional Google Sheets logger) ──
 // Setup: Extensions → Apps Script → paste doPost handler → Deploy as web app (Anyone) → paste URL here
 const SHEETS_ENDPOINT = 'https://script.google.com/macros/s/AKfycbx6S-nn5jBqF3ZaYACvM-Cq_7fn9WPv7Yhyikph3F_0QhZcp4Q6FHFK6DbGQ47FiGJ1/exec';
-const APP_BUILD = '20260327-b11'; // bump this on every push so Sheets confirms which build you're testing
+const APP_BUILD = '20260327-b12'; // bump this on every push so Sheets confirms which build you're testing
 
 let difficulty='easy', timePerRaga=8, ragaCount=10;
 let lastSurpriseThemeIdx=-1, activeTheme=null;
@@ -1343,8 +1343,14 @@ function enableDownloadButton(){
 
 // Remux fragmented MP4 (fMP4) from MediaRecorder into a true flat non-fragmented MP4.
 // Pipeline: mp4box.js parses + extracts samples → mp4-muxer writes ftyp+moov+mdat.
-// mp4box.js addSample() always produces fMP4 (moof+mdat), which WhatsApp/ExoPlayer rejects.
-// mp4-muxer with fastStart:'in-memory' produces ftyp→moov→mdat — no moof boxes at all.
+//
+// Key fix (b12): do NOT use track.nb_samples for completion detection.
+// iOS Safari's fMP4 has nb_samples=0 per track (counts live in trun boxes, not moov).
+// The old check `allSamples.length >= nb_samples` → 0>=0=TRUE immediately → buildFlatMp4
+// ran with empty arrays → 0-frame MP4 → "cannot be played" on iOS.
+//
+// mp4box.js fires all callbacks synchronously within appendBuffer(). After appendBuffer+flush,
+// all samples are already in allSamples — no async wait, no nb_samples check needed.
 function remuxToMp4(fmp4Blob){
   return new Promise((resolve,reject)=>{
     fmp4Blob.arrayBuffer().then(ab=>{
@@ -1352,7 +1358,6 @@ function remuxToMp4(fmp4Blob){
         const inFile=MP4Box.createFile();
         const allSamples={};   // trackId → samples[]
         const trackMeta={};    // trackId → {track, entry}
-        let built=false;
 
         inFile.onError=e=>reject(new Error('mp4box:'+e));
 
@@ -1366,67 +1371,85 @@ function remuxToMp4(fmp4Blob){
           inFile.start();
         };
 
-        inFile.onSamples=(id,user,samples)=>{
-          allSamples[id].push(...samples);
-          if(built) return;
-          // Wait until every track has all its samples (onSamples may fire in batches)
-          const done=Object.keys(trackMeta).every(
-            tid=>allSamples[tid].length>=trackMeta[tid].track.nb_samples
-          );
-          if(!done) return;
-          built=true;
-          try{
-            const videoId=Object.keys(trackMeta).find(id=>trackMeta[id].track.type==='video');
-            const audioId=Object.keys(trackMeta).find(id=>trackMeta[id].track.type==='audio');
-            const vMeta=videoId?trackMeta[videoId]:null;
-            const aMeta=audioId?trackMeta[audioId]:null;
-
-            const mxOpts={
-              target:new Mp4Muxer.ArrayBufferTarget(),
-              fastStart:'in-memory',
-              firstTimestampBehavior:'offset'
-            };
-            if(vMeta) mxOpts.video={codec:'avc',width:vMeta.track.video.width,height:vMeta.track.video.height};
-            if(aMeta) mxOpts.audio={codec:'aac',numberOfChannels:aMeta.track.audio.channel_count,sampleRate:aMeta.track.audio.sample_rate};
-
-            const muxer=new Mp4Muxer.Muxer(mxOpts);
-
-            if(vMeta){
-              // avcC decoder config record: raw bytes after the 8-byte box header
-              const c=vMeta.entry.avcC;
-              const desc=ab.slice(c.start+c.hdr_size,c.start+c.size);
-              const ts=vMeta.track.timescale;
-              allSamples[videoId].forEach((s,i)=>muxer.addVideoChunkRaw(
-                s.data, s.is_sync?'key':'delta',
-                Math.round((s.cts/ts)*1e6),
-                Math.round((s.duration/ts)*1e6),
-                i===0?{decoderConfig:{description:desc}}:undefined
-              ));
-            }
-            if(aMeta){
-              // AudioSpecificConfig: 2-byte payload inside esds → esd → DecoderSpecificInfo (tag 5)
-              const d=aMeta.entry.esds.esd.descs[0].descs[0].data;
-              const asc=new Uint8Array(Object.keys(d).length);
-              for(let i=0;i<asc.length;i++) asc[i]=d[i];
-              const ts=aMeta.track.timescale;
-              allSamples[audioId].forEach((s,i)=>muxer.addAudioChunkRaw(
-                s.data,'key',
-                Math.round((s.cts/ts)*1e6),
-                Math.round((s.duration/ts)*1e6),
-                i===0?{decoderConfig:{description:asc.buffer}}:undefined
-              ));
-            }
-            muxer.finalize();
-            resolve(new Blob([muxer.target.buffer],{type:'video/mp4'}));
-          }catch(e2){ reject(e2); }
-        };
+        // Simple accumulator — no completion check here.
+        // mp4box.js fires onSamples synchronously during appendBuffer/flush.
+        inFile.onSamples=(id,user,samples)=>{ allSamples[id].push(...samples); };
 
         const buf=ab.slice(0); buf.fileStart=0;
-        inFile.appendBuffer(buf);
-        inFile.flush();
+        inFile.appendBuffer(buf); // fires onReady → start() → onSamples synchronously
+        inFile.flush();           // delivers any remaining samples
+
+        // After appendBuffer+flush all samples are collected — build now
+        if(Object.keys(trackMeta).length===0){ reject(new Error('no tracks')); return; }
+        buildFlatMp4(ab,trackMeta,allSamples,resolve,reject);
+
       }catch(e){ reject(e); }
     }).catch(reject);
   });
+}
+
+// Mux extracted mp4box.js samples into a flat non-fragmented MP4 via mp4-muxer.
+// Extracted as a standalone function so remuxToMp4 stays readable.
+function buildFlatMp4(origAb,trackMeta,allSamples,resolve,reject){
+  try{
+    const videoId=Object.keys(trackMeta).find(id=>trackMeta[id].track.type==='video');
+    const audioId=Object.keys(trackMeta).find(id=>trackMeta[id].track.type==='audio');
+    const vMeta=videoId?trackMeta[videoId]:null;
+    const aMeta=audioId?trackMeta[audioId]:null;
+
+    // Guard: reject explicitly on 0 video samples — avoids silently producing an unplayable file
+    if(vMeta&&allSamples[videoId].length===0){ reject(new Error('no video samples')); return; }
+
+    const hasAudio=aMeta&&allSamples[audioId].length>0;
+    const mxOpts={
+      target:new Mp4Muxer.ArrayBufferTarget(),
+      fastStart:'in-memory',
+      firstTimestampBehavior:'offset'
+    };
+    if(vMeta) mxOpts.video={codec:'avc',width:vMeta.track.video.width,height:vMeta.track.video.height};
+    if(hasAudio) mxOpts.audio={codec:'aac',numberOfChannels:aMeta.track.audio.channel_count,sampleRate:aMeta.track.audio.sample_rate};
+
+    const muxer=new Mp4Muxer.Muxer(mxOpts);
+
+    if(vMeta){
+      // avcC decoder config record: raw bytes after the box header (hdr_size = 8 for standard box)
+      const c=vMeta.entry.avcC;
+      const desc=origAb.slice(c.start+c.hdr_size,c.start+c.size);
+      const ts=vMeta.track.timescale;
+      allSamples[videoId].forEach((s,i)=>muxer.addVideoChunkRaw(
+        s.data,s.is_sync?'key':'delta',
+        Math.round((s.cts/ts)*1e6),
+        Math.round((s.duration/ts)*1e6),
+        i===0?{decoderConfig:{description:desc}}:undefined
+      ));
+    }
+    if(hasAudio){
+      // AudioSpecificConfig: 2-byte payload from esds DecoderSpecificInfo (tag 5).
+      // Falls back to computing it from sample rate + channel count if esds structure differs
+      // (iOS Safari may nest descriptors differently than Chrome).
+      let asc;
+      try{
+        const d=aMeta.entry.esds.esd.descs[0].descs[0].data;
+        asc=new Uint8Array(Object.keys(d).length);
+        for(let i=0;i<asc.length;i++) asc[i]=d[i];
+      }catch(_){
+        // AAC-LC objectType=2, sampleRateIndex from standard table, then channelCount
+        const srIdx=[96000,88200,64000,48000,44100,32000,24000,22050,16000,12000,11025,8000,7350]
+          .indexOf(aMeta.track.audio.sample_rate);
+        const w=(2<<11)|(Math.max(0,srIdx)<<7)|(aMeta.track.audio.channel_count<<3);
+        asc=new Uint8Array([(w>>8)&0xFF,w&0xFF]);
+      }
+      const ts=aMeta.track.timescale;
+      allSamples[audioId].forEach((s,i)=>muxer.addAudioChunkRaw(
+        s.data,'key',
+        Math.round((s.cts/ts)*1e6),
+        Math.round((s.duration/ts)*1e6),
+        i===0?{decoderConfig:{description:asc.buffer}}:undefined
+      ));
+    }
+    muxer.finalize();
+    resolve(new Blob([muxer.target.buffer],{type:'video/mp4'}));
+  }catch(e){ reject(e); }
 }
 
 async function processVideoInBackground(){

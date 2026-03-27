@@ -9,6 +9,8 @@
 <title>Raga Challenge</title>
 <link href="https://fonts.googleapis.com/css2?family=Cormorant+Garamond:ital,wght@0,600;0,700;1,600&family=DM+Sans:opsz,wght@9..40,400;9..40,500;9..40,600;9..40,700&display=swap" rel="stylesheet">
 <script src="https://unpkg.com/@phosphor-icons/web@2.1.1"></script>
+<script src="https://cdn.jsdelivr.net/npm/mp4box@0.5.2/dist/mp4box.all.min.js"></script>
+<script src="https://cdn.jsdelivr.net/npm/mp4-muxer@5.2.2/build/mp4-muxer.min.js"></script>
 <style>
 *, *::before, *::after { box-sizing: border-box; margin: 0; padding: 0; }
 :root {
@@ -513,7 +515,7 @@ function modeLabel(){ return {easy:'Easy',notSoEasy:'Not So Easy',surpriseMe:'Su
 // ── Feedback analytics endpoint (optional Google Sheets logger) ──
 // Setup: Extensions → Apps Script → paste doPost handler → Deploy as web app (Anyone) → paste URL here
 const SHEETS_ENDPOINT = 'https://script.google.com/macros/s/AKfycbx6S-nn5jBqF3ZaYACvM-Cq_7fn9WPv7Yhyikph3F_0QhZcp4Q6FHFK6DbGQ47FiGJ1/exec';
-const APP_BUILD = '20260328-b23'; // bump this on every push so Sheets confirms which build you're testing
+const APP_BUILD = '20260328-b24'; // bump this on every push so Sheets confirms which build you're testing
 const CLOUDINARY_CLOUD = 'dfstch1ag';
 const CLOUDINARY_PRESET = 'forRagaChallange';
 const CLOUDINARY_UPLOAD_URL = 'https://api.cloudinary.com/v1_1/dfstch1ag/video/upload';
@@ -832,9 +834,9 @@ function startRecording(){
   // iOS only supports MP4 recording; all others prefer WebM (Cloudinary handles WebM→MP4 perfectly).
   // Chrome's MP4 recording produces fMP4 which Cloudinary truncates to ~2s.
   const isIOS=/iPad|iPhone|iPod/.test(navigator.userAgent)||(navigator.platform==='MacIntel'&&navigator.maxTouchPoints>1);
-  const mimes=isIOS
-    ? ['video/mp4;codecs=avc1,mp4a.40.2','video/mp4']
-    : ['video/webm;codecs=vp9,opus','video/webm;codecs=vp8,opus','video/webm','video/mp4;codecs=avc1,mp4a.40.2','video/mp4'];
+  // All browsers: prefer MP4 (H264+AAC) so we can client-side remux fMP4→flat MP4.
+  // WebM fallback for browsers that don't support MP4 recording (rare).
+  const mimes=['video/mp4;codecs=avc1,mp4a.40.2','video/mp4','video/webm;codecs=vp9,opus','video/webm;codecs=vp8,opus','video/webm'];
   const mime=mimes.find(m=>MediaRecorder.isTypeSupported(m))||'video/webm';
   nativeMp4=mime.startsWith('video/mp4');
   // Halve bitrate on mobile — same quality at phone resolutions, significantly less encoder heat
@@ -1350,10 +1352,9 @@ function enableDownloadButton(){
   // Show diagnostic info below button (temporary — remove after debugging)
   const d=window._rcDiag||{};
   const sizeMB=d.mp4BlobSize?((d.mp4BlobSize/1048576).toFixed(1)+'MB'):'?';
-  const moov=d.moovPosition||'?';
-  const cs=navigator.canShare?navigator.canShare({files:[new File([new Uint8Array(1)],'t.mp4',{type:'video/mp4'})]}):'no';
+  const pipe=d.pipeline||'?';
   const diag=document.getElementById('rc-diag');
-  if(diag) diag.textContent=APP_BUILD+' | '+sizeMB+' | moov:'+moov+' | canShare:'+cs+' | '+((d.pipelineResult)||'?');
+  if(diag) diag.textContent=APP_BUILD+' | '+sizeMB+' | '+pipe+' | '+((d.pipelineResult)||'?');
 }
 
 
@@ -1399,92 +1400,89 @@ function cleanupCloudinary(){
   }).catch(()=>{}); // fire and forget
 }
 
-// Move MOOV atom before MDAT for WhatsApp Android compatibility (faststart).
-// WhatsApp Android rejects MP4 files where moov is at the end because its
-// progressive validator needs metadata first. This is a pure binary rewrite —
-// no re-encoding, no dependencies. ~O(filesize) memory + one pass.
-async function ensureFastStart(blob){
-  const buf=await blob.arrayBuffer();
-  const view=new DataView(buf);
-  const boxes=[];
-  let offset=0;
-  // Parse top-level MP4 boxes
-  while(offset<buf.byteLength-8){
-    const size=view.getUint32(offset);
-    const type=String.fromCharCode(view.getUint8(offset+4),view.getUint8(offset+5),view.getUint8(offset+6),view.getUint8(offset+7));
-    if(size<8) break; // invalid box
-    boxes.push({type,offset,size});
-    offset+=size;
-  }
-  const moov=boxes.find(b=>b.type==='moov');
-  const mdat=boxes.find(b=>b.type==='mdat');
-  if(!moov||!mdat){
-    window._rcDiag.moovPosition='missing';
-    return blob; // can't fix, return as-is
-  }
-  if(moov.offset<mdat.offset){
-    window._rcDiag.moovPosition='already-faststart';
-    return blob; // already faststart
-  }
-  // moov is after mdat — need to move it before mdat
-  window._rcDiag.moovPosition='fixed';
-  const moovData=new Uint8Array(buf,moov.offset,moov.size);
-  // Adjust stco/co64 chunk offsets inside moov (they point into mdat)
-  // Every absolute offset increases by moov.size because we're inserting moov before mdat
-  const delta=moov.size;
-  const moovBuf=new ArrayBuffer(moov.size);
-  new Uint8Array(moovBuf).set(moovData);
-  const mv=new DataView(moovBuf);
-  // Recursively scan moov for stco and co64 boxes
-  function fixOffsets(start,end){
-    let pos=start;
-    while(pos<end-8){
-      const sz=mv.getUint32(pos);
-      const t=String.fromCharCode(mv.getUint8(pos+4),mv.getUint8(pos+5),mv.getUint8(pos+6),mv.getUint8(pos+7));
-      if(sz<8||pos+sz>end) break;
-      if(t==='stco'){
-        const count=mv.getUint32(pos+12);
-        for(let i=0;i<count;i++){
-          const o=pos+16+i*4;
-          mv.setUint32(o,mv.getUint32(o)+delta);
-        }
-      }else if(t==='co64'){
-        const count=mv.getUint32(pos+12);
-        for(let i=0;i<count;i++){
-          const o=pos+16+i*8;
-          // Read as two 32-bit values (hi+lo) since DataView doesn't have getUint64
-          const hi=mv.getUint32(o);
-          const lo=mv.getUint32(o+4);
-          const val=hi*0x100000000+lo+delta;
-          mv.setUint32(o,Math.floor(val/0x100000000));
-          mv.setUint32(o+4,val>>>0);
-        }
-      }else if(t==='trak'||t==='mdia'||t==='minf'||t==='stbl'){
-        fixOffsets(pos+8,pos+sz); // recurse into container boxes
-      }
-      pos+=sz;
-    }
-  }
-  fixOffsets(0,moov.size);
-  // Rebuild: everything before mdat + moov + mdat + everything after mdat (except old moov)
-  const parts=[];
-  // Boxes before mdat (ftyp, etc.)
-  for(const b of boxes){
-    if(b.type==='mdat') break;
-    if(b.type==='moov') continue; // skip old moov position
-    parts.push(new Uint8Array(buf,b.offset,b.size));
-  }
-  // Insert moov before mdat
-  parts.push(new Uint8Array(moovBuf));
-  // mdat
-  parts.push(new Uint8Array(buf,mdat.offset,mdat.size));
-  // Anything after mdat that isn't moov
-  for(const b of boxes){
-    if(b.offset<=mdat.offset) continue;
-    if(b.type==='moov') continue;
-    parts.push(new Uint8Array(buf,b.offset,b.size));
-  }
-  return new Blob(parts,{type:'video/mp4'});
+// Remux fragmented MP4 → flat MP4 using mp4box.js (parser) + mp4-muxer (writer).
+// Cloudinary's on-the-fly transform outputs fMP4 (fragmented) with H264 High profile
+// which WhatsApp Android rejects. Client-side remux produces flat MP4 that works everywhere.
+// Proven on Chrome in b11. iOS uses Cloudinary path (WhatsApp iOS re-encodes anyway).
+function remuxToFlatMp4(fmp4Blob){
+  return new Promise((resolve,reject)=>{
+    fmp4Blob.arrayBuffer().then(ab=>{
+      try{
+        const inFile=MP4Box.createFile();
+        const allSamples={};
+        const trackMeta={};
+        let built=false;
+
+        inFile.onError=e=>reject(new Error('mp4box:'+e));
+
+        inFile.onReady=info=>{
+          info.tracks.forEach(track=>{
+            allSamples[track.id]=[];
+            const trak=inFile.getTrackById(track.id);
+            trackMeta[track.id]={track,entry:trak.mdia.minf.stbl.stsd.entries[0]};
+            inFile.setExtractionOptions(track.id,null,{nbSamples:Infinity});
+          });
+          inFile.start();
+        };
+
+        inFile.onSamples=(id,user,samples)=>{
+          allSamples[id].push(...samples);
+          if(built) return;
+          const done=Object.keys(trackMeta).every(
+            tid=>allSamples[tid].length>=trackMeta[tid].track.nb_samples
+          );
+          if(!done) return;
+          built=true;
+          try{
+            const videoId=Object.keys(trackMeta).find(id=>trackMeta[id].track.type==='video');
+            const audioId=Object.keys(trackMeta).find(id=>trackMeta[id].track.type==='audio');
+            const vMeta=videoId?trackMeta[videoId]:null;
+            const aMeta=audioId?trackMeta[audioId]:null;
+
+            const mxOpts={
+              target:new Mp4Muxer.ArrayBufferTarget(),
+              fastStart:'in-memory',
+              firstTimestampBehavior:'offset'
+            };
+            if(vMeta) mxOpts.video={codec:'avc',width:vMeta.track.video.width,height:vMeta.track.video.height};
+            if(aMeta) mxOpts.audio={codec:'aac',numberOfChannels:aMeta.track.audio.channel_count,sampleRate:aMeta.track.audio.sample_rate};
+
+            const muxer=new Mp4Muxer.Muxer(mxOpts);
+
+            if(vMeta){
+              const c=vMeta.entry.avcC;
+              const desc=ab.slice(c.start+c.hdr_size,c.start+c.size);
+              const ts=vMeta.track.timescale;
+              allSamples[videoId].forEach((s,i)=>muxer.addVideoChunkRaw(
+                s.data, s.is_sync?'key':'delta',
+                Math.round((s.cts/ts)*1e6),
+                Math.round((s.duration/ts)*1e6),
+                i===0?{decoderConfig:{description:desc}}:undefined
+              ));
+            }
+            if(aMeta){
+              const d=aMeta.entry.esds.esd.descs[0].descs[0].data;
+              const asc=new Uint8Array(Object.keys(d).length);
+              for(let i=0;i<asc.length;i++) asc[i]=d[i];
+              const ts=aMeta.track.timescale;
+              allSamples[audioId].forEach((s,i)=>muxer.addAudioChunkRaw(
+                s.data,'key',
+                Math.round((s.cts/ts)*1e6),
+                Math.round((s.duration/ts)*1e6),
+                i===0?{decoderConfig:{description:asc.buffer}}:undefined
+              ));
+            }
+            muxer.finalize();
+            resolve(new Blob([muxer.target.buffer],{type:'video/mp4'}));
+          }catch(e2){ reject(e2); }
+        };
+
+        const buf=ab.slice(0); buf.fileStart=0;
+        inFile.appendBuffer(buf);
+        inFile.flush();
+      }catch(e){ reject(e); }
+    }).catch(reject);
+  });
 }
 
 async function processVideoInBackground(){
@@ -1505,35 +1503,42 @@ async function processVideoInBackground(){
   const isOnDone=()=>document.getElementById('done-screen').classList.contains('active');
 
   try{
-    // Phase 1: Upload raw recording to Cloudinary
-    setConv(5,'Uploading\u2026');
-    const uploadResult=await uploadToCloudinary(finalBlob);
-    window._rcDiag.uploadUrl=uploadResult.secure_url;
-    window._rcDiag.uploadBytes=uploadResult.bytes;
-    if(uploadResult.delete_token) _cdDeleteToken=uploadResult.delete_token;
-    console.log('[RC] upload OK bytes='+uploadResult.bytes);
-
-    // Phase 2: Fetch converted flat MP4 back
-    setConv(80,'Converting\u2026');
-    const mp4Url=uploadResult.secure_url.replace(/\/upload\//,'/upload/f_mp4,vc_h264,ac_aac,af_44100/').replace(/\.[^.]+$/,'.mp4');
-    mp4DirectUrl=mp4Url; // store for direct download fallback
-    const fetchAbort=new AbortController();
-    const fetchTimer=setTimeout(()=>fetchAbort.abort(),40000);
-    const resp=await fetch(mp4Url,{signal:fetchAbort.signal});
-    if(!resp.ok) throw new Error('mp4 fetch HTTP '+resp.status);
-    let rawMp4=await resp.blob();
-    clearTimeout(fetchTimer);
-    window._rcDiag.mp4BlobSizeRaw=rawMp4.size;
-    window._rcDiag.mp4ContentType=resp.headers.get('content-type');
-    // Ensure moov atom is before mdat (faststart) — required by WhatsApp Android
-    setConv(90,'Optimising\u2026');
-    mp4Blob=await ensureFastStart(rawMp4);
-    window._rcDiag.mp4BlobSize=mp4Blob.size;
-    // Verify first 8 bytes — valid MP4 has 'ftyp' at offset 4
-    const _peek=new Uint8Array(await mp4Blob.slice(0,8).arrayBuffer());
-    window._rcDiag.mp4Header=Array.from(_peek).map(b=>b.toString(16).padStart(2,'0')).join(' ');
-    window._rcDiag.pipelineResult='ok';
-    console.log('[RC] mp4 fetch OK size='+mp4Blob.size+' type='+resp.headers.get('content-type')+' hdr='+window._rcDiag.mp4Header);
+    if(nativeMp4){
+      // ── Path A: Client-side remux (Chrome/Android/Desktop) ──
+      // MediaRecorder outputs fMP4 (fragmented). WhatsApp Android rejects fMP4.
+      // Remux to flat MP4 locally using mp4box.js + mp4-muxer (~1-2s, no server).
+      // Proven on Chrome in b11. Preserves original codec (H264 Baseline from hardware encoder).
+      setConv(30,'Processing\u2026');
+      window._rcDiag.pipeline='client-remux';
+      const _timeout=new Promise((_,r)=>setTimeout(()=>r(new Error('remux timeout')),15000));
+      mp4Blob=await Promise.race([remuxToFlatMp4(finalBlob),_timeout]);
+      window._rcDiag.mp4BlobSize=mp4Blob.size;
+      window._rcDiag.pipelineResult='ok';
+      console.log('[RC] remux OK size='+mp4Blob.size);
+    } else {
+      // ── Path B: Cloudinary (WebM fallback — rare, or iOS if it ever records WebM) ──
+      // WebM can't be remuxed to MP4 client-side without re-encoding.
+      // Upload to Cloudinary for server-side transcode.
+      setConv(5,'Uploading\u2026');
+      window._rcDiag.pipeline='cloudinary';
+      const uploadResult=await uploadToCloudinary(finalBlob);
+      window._rcDiag.uploadUrl=uploadResult.secure_url;
+      window._rcDiag.uploadBytes=uploadResult.bytes;
+      if(uploadResult.delete_token) _cdDeleteToken=uploadResult.delete_token;
+      console.log('[RC] upload OK bytes='+uploadResult.bytes);
+      setConv(80,'Converting\u2026');
+      const mp4Url=uploadResult.secure_url.replace(/\/upload\//,'/upload/f_mp4,vc_h264,ac_aac,af_44100/').replace(/\.[^.]+$/,'.mp4');
+      mp4DirectUrl=mp4Url;
+      const fetchAbort=new AbortController();
+      const fetchTimer=setTimeout(()=>fetchAbort.abort(),40000);
+      const resp=await fetch(mp4Url,{signal:fetchAbort.signal});
+      if(!resp.ok) throw new Error('mp4 fetch HTTP '+resp.status);
+      mp4Blob=await resp.blob();
+      clearTimeout(fetchTimer);
+      window._rcDiag.mp4BlobSize=mp4Blob.size;
+      window._rcDiag.pipelineResult='ok';
+      console.log('[RC] cloudinary OK size='+mp4Blob.size);
+    }
   }catch(e){
     console.log('[RC] pipeline FAILED:',e.message);
     window._rcDiag.pipelineResult='fail:'+e.message;

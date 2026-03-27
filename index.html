@@ -514,7 +514,7 @@ function modeLabel(){ return {easy:'Easy',notSoEasy:'Not So Easy',surpriseMe:'Su
 // ── Feedback analytics endpoint (optional Google Sheets logger) ──
 // Setup: Extensions → Apps Script → paste doPost handler → Deploy as web app (Anyone) → paste URL here
 const SHEETS_ENDPOINT = 'https://script.google.com/macros/s/AKfycbx6S-nn5jBqF3ZaYACvM-Cq_7fn9WPv7Yhyikph3F_0QhZcp4Q6FHFK6DbGQ47FiGJ1/exec';
-const APP_BUILD = '20260328-b29'; // bump this on every push so Sheets confirms which build you're testing
+const APP_BUILD = '20260328-b30'; // bump this on every push so Sheets confirms which build you're testing
 const CLOUDINARY_CLOUD = 'dfstch1ag';
 const CLOUDINARY_PRESET = 'forRagaChallange';
 const CLOUDINARY_UPLOAD_URL = 'https://api.cloudinary.com/v1_1/dfstch1ag/video/upload';
@@ -1624,12 +1624,14 @@ async function processVideoInBackground(){
   console.log('[RC] finalBlob size='+finalBlob.size+' chunks='+chunks.length+' nativeMp4='+nativeMp4+' actuallyMp4='+actuallyMp4+' hdr='+hdrHex);
   const isOnDone=()=>document.getElementById('done-screen').classList.contains('active');
 
+  // iOS detection — iOS uses Cloudinary (WhatsApp iOS re-encodes anyway; client-remux has CTS issues on iOS)
+  const _isIOS=/iPad|iPhone|iPod/.test(navigator.userAgent)||(navigator.platform==='MacIntel'&&navigator.maxTouchPoints>1);
+
   try{
-    if(nativeMp4&&actuallyMp4){
-      // ── Path A: Client-side remux (Chrome/Android/Desktop) ──
-      // MediaRecorder outputs fMP4 (fragmented). WhatsApp Android rejects fMP4.
-      // Remux to flat MP4 locally using mp4box.js + mp4-muxer (~1-2s, no server).
-      // Proven on Chrome in b11. Preserves original codec (H264 Baseline from hardware encoder).
+    if(nativeMp4&&actuallyMp4&&!_isIOS){
+      // ── Path A: Client-side remux (Android/Desktop) ──
+      // MediaRecorder outputs fMP4 (fragmented). WhatsApp Android rejects fMP4 + High profile.
+      // Remux to flat MP4 locally using custom parser + mp4-muxer (~1-2s, no server).
       setConv(30,'Processing\u2026');
       window._rcDiag.pipeline='client-remux';
       const _timeout=new Promise((_,r)=>setTimeout(()=>r(new Error('remux timeout')),15000));
@@ -1638,9 +1640,9 @@ async function processVideoInBackground(){
       window._rcDiag.pipelineResult='ok';
       console.log('[RC] remux OK size='+mp4Blob.size);
     } else {
-      // ── Path B: Cloudinary (WebM fallback — rare, or iOS if it ever records WebM) ──
-      // WebM can't be remuxed to MP4 client-side without re-encoding.
-      // Upload to Cloudinary for server-side transcode.
+      // ── Path B: Cloudinary (iOS + WebM fallback) ──
+      // iOS: WhatsApp iOS re-encodes all videos, so Cloudinary fMP4 output is fine.
+      // WebM: can't remux to MP4 client-side without re-encoding.
       setConv(5,'Uploading\u2026');
       window._rcDiag.pipeline='cloudinary';
       const uploadResult=await uploadToCloudinary(finalBlob);

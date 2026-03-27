@@ -444,6 +444,7 @@ html, body {
     <!-- Sticky action buttons -->
     <div class="done-actions">
       <button class="download-btn" id="dl-btn" onclick="shareOrDownload()" disabled><i class="ph-bold ph-circle-notch spin-icon"></i> Preparing…</button>
+      <div id="rc-diag" style="font:10px/1.2 monospace;color:#888;text-align:center;padding:2px 0;"></div>
       <div class="done-secondary-row">
         <button class="invite-btn" onclick="inviteFriend()"><i class="ph ph-link-simple"></i> Invite</button>
         <button class="restart-btn" onclick="restart()"><i class="ph ph-arrow-counter-clockwise"></i> New Challenge</button>
@@ -512,7 +513,7 @@ function modeLabel(){ return {easy:'Easy',notSoEasy:'Not So Easy',surpriseMe:'Su
 // ── Feedback analytics endpoint (optional Google Sheets logger) ──
 // Setup: Extensions → Apps Script → paste doPost handler → Deploy as web app (Anyone) → paste URL here
 const SHEETS_ENDPOINT = 'https://script.google.com/macros/s/AKfycbx6S-nn5jBqF3ZaYACvM-Cq_7fn9WPv7Yhyikph3F_0QhZcp4Q6FHFK6DbGQ47FiGJ1/exec';
-const APP_BUILD = '20260328-b20'; // bump this on every push so Sheets confirms which build you're testing
+const APP_BUILD = '20260328-b21'; // bump this on every push so Sheets confirms which build you're testing
 const CLOUDINARY_CLOUD = 'dfstch1ag';
 const CLOUDINARY_PRESET = 'forRagaChallange';
 const CLOUDINARY_UPLOAD_URL = 'https://api.cloudinary.com/v1_1/dfstch1ag/video/upload';
@@ -1345,6 +1346,12 @@ function enableDownloadButton(){
   const canShare=navigator.canShare&&navigator.canShare({files:[new File([],'x.mp4',{type:'video/mp4'})]});
   btn.innerHTML=canShare?'<i class="ph-bold ph-share-network"></i> Share Video':'<i class="ph-bold ph-download-simple"></i> Download MP4';
   btn.disabled=false;
+  // Show diagnostic info below button (temporary — remove after debugging)
+  const d=window._rcDiag||{};
+  const sizeMB=d.mp4BlobSize?((d.mp4BlobSize/1048576).toFixed(1)+'MB'):'?';
+  const moov=d.moovPosition||'?';
+  const diag=document.getElementById('rc-diag');
+  if(diag) diag.textContent=APP_BUILD+' | '+sizeMB+' | moov:'+moov+' | '+((d.pipelineResult)||'?');
 }
 
 
@@ -1506,7 +1513,7 @@ async function processVideoInBackground(){
 
     // Phase 2: Fetch converted flat MP4 back
     setConv(80,'Converting\u2026');
-    const mp4Url=uploadResult.secure_url.replace(/\/upload\//,'/upload/f_mp4,vc_h264:baseline:3.1,ac_aac,af_44100/').replace(/\.[^.]+$/,'.mp4');
+    const mp4Url=uploadResult.secure_url.replace(/\/upload\//,'/upload/f_mp4,vc_h264:baseline:3.0,ac_aac,q_auto/').replace(/\.[^.]+$/,'.mp4');
     const fetchAbort=new AbortController();
     const fetchTimer=setTimeout(()=>fetchAbort.abort(),40000);
     const resp=await fetch(mp4Url,{signal:fetchAbort.signal});

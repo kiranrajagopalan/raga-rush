@@ -512,7 +512,7 @@ function modeLabel(){ return {easy:'Easy',notSoEasy:'Not So Easy',surpriseMe:'Su
 // ── Feedback analytics endpoint (optional Google Sheets logger) ──
 // Setup: Extensions → Apps Script → paste doPost handler → Deploy as web app (Anyone) → paste URL here
 const SHEETS_ENDPOINT = 'https://script.google.com/macros/s/AKfycbx6S-nn5jBqF3ZaYACvM-Cq_7fn9WPv7Yhyikph3F_0QhZcp4Q6FHFK6DbGQ47FiGJ1/exec';
-const APP_BUILD = '20260327-b15'; // bump this on every push so Sheets confirms which build you're testing
+const APP_BUILD = '20260327-b16'; // bump this on every push so Sheets confirms which build you're testing
 const CLOUDINARY_CLOUD = 'dfstch1ag';
 const CLOUDINARY_PRESET = 'forRagaChallange';
 const CLOUDINARY_UPLOAD_URL = 'https://api.cloudinary.com/v1_1/dfstch1ag/video/upload';
@@ -1412,8 +1412,9 @@ async function processVideoInBackground(){
     console.log('[RC] upload OK bytes='+uploadResult.bytes);
 
     // Phase 2: Fetch converted flat MP4 back
+    // Force full re-encode (vc_h264 + ac_aac) — f_mp4 alone may passthrough fMP4 unchanged
     setConv(80,'Converting\u2026');
-    const mp4Url=uploadResult.secure_url.replace('/upload/','/upload/f_mp4/');
+    const mp4Url=uploadResult.secure_url.replace('/upload/','/upload/f_mp4,vc_h264,ac_aac/');
     const resp=await fetch(mp4Url);
     if(!resp.ok) throw new Error('mp4 fetch HTTP '+resp.status);
     mp4Blob=await resp.blob();

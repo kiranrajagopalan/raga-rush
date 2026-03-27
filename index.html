@@ -513,7 +513,7 @@ function modeLabel(){ return {easy:'Easy',notSoEasy:'Not So Easy',surpriseMe:'Su
 // ── Feedback analytics endpoint (optional Google Sheets logger) ──
 // Setup: Extensions → Apps Script → paste doPost handler → Deploy as web app (Anyone) → paste URL here
 const SHEETS_ENDPOINT = 'https://script.google.com/macros/s/AKfycbx6S-nn5jBqF3ZaYACvM-Cq_7fn9WPv7Yhyikph3F_0QhZcp4Q6FHFK6DbGQ47FiGJ1/exec';
-const APP_BUILD = '20260328-b34'; // bump this on every push so Sheets confirms which build you're testing
+const APP_BUILD = '20260328-b35'; // bump this on every push so Sheets confirms which build you're testing
 const CLOUDINARY_CLOUD = 'dfstch1ag';
 const CLOUDINARY_PRESET = 'forRagaChallange';
 const CLOUDINARY_UPLOAD_URL = 'https://api.cloudinary.com/v1_1/dfstch1ag/video/upload';
@@ -1490,8 +1490,6 @@ function remuxToFlatMp4(fmp4Blob){
         };
       }
     }
-    console.log('[RC] trex defaults:',JSON.stringify(trexDefaults));
-
     // Parse moof+mdat pairs for samples
     const samples={};
     for(const tid in tracks) samples[tid]=[];
@@ -1530,8 +1528,6 @@ function remuxToFlatMp4(fmp4Blob){
         let firstFlags=0;
         if(trFlags&0x04){firstFlags=dv.getUint32(tp);tp+=4;}
 
-        console.log('[RC] trun: tid='+tfTid+' count='+count+' trFlags=0x'+trFlags.toString(16)+' tfFlags=0x'+tfFlags.toString(16)+' defSz='+defSz+' dataOff='+dataOff);
-
         let sOff=moofOff+dataOff;
         for(let s=0;s<count;s++){
           let dur=defDur,sz=defSz,fl=defFl,cts=0;
@@ -1557,9 +1553,6 @@ function remuxToFlatMp4(fmp4Blob){
     const aId=Object.keys(tracks).find(id=>tracks[id].type==='audio');
     const vSamp=vId?samples[vId]:[];
     const aSamp=aId?samples[aId]:[];
-    // Store comprehensive diagnostics
-    window._rcDiag.fmp4={trk:trkInfo,samp:allSampCounts,moofs:top.filter(b=>b.t==='moof').length,trex:JSON.stringify(trexDefaults)};
-    console.log('[RC] fMP4 parsed: tracks=['+trkInfo+'] samples=['+allSampCounts+']');
     if(vSamp.length===0){
       const detail='trk=['+trkInfo+'] samp=['+allSampCounts+'] moofs='+top.filter(b=>b.t==='moof').length+' trex='+JSON.stringify(trexDefaults);
       throw new Error('remux:0vSamp '+detail);
@@ -1600,7 +1593,6 @@ function remuxToFlatMp4(fmp4Blob){
 async function processVideoInBackground(){
   if(processingStarted) return;
   processingStarted=true;
-  window._rcDiag={build:APP_BUILD,ua:navigator.userAgent,chunks:chunks.length,nativeMp4};
   if(chunks.length===0){
     uploadFailed=true;
     clearTimeout(processingGuard);
@@ -1610,14 +1602,11 @@ async function processVideoInBackground(){
   }
   uploadFailed=false;
   finalBlob=new Blob(chunks,{type:nativeMp4?'video/mp4':'video/webm'});
-  window._rcDiag.finalBlobSize=finalBlob.size;
   // Detect actual format from first bytes (Chrome may lie about MP4 support)
   const hdr=new Uint8Array(await finalBlob.slice(0,12).arrayBuffer());
   const hdrHex=Array.from(hdr).map(b=>b.toString(16).padStart(2,'0')).join(' ');
-  window._rcDiag.blobHeader=hdrHex;
   const actuallyMp4=hdrHex.includes('66 74 79 70'); // 'ftyp' marker
   const actuallyWebm=(hdr[0]===0x1a&&hdr[1]===0x45&&hdr[2]===0xdf&&hdr[3]===0xa3);
-  console.log('[RC] finalBlob size='+finalBlob.size+' chunks='+chunks.length+' nativeMp4='+nativeMp4+' actuallyMp4='+actuallyMp4+' hdr='+hdrHex);
   const isOnDone=()=>document.getElementById('done-screen').classList.contains('active');
 
   // iOS detection — iOS uses Cloudinary (WhatsApp iOS re-encodes anyway; client-remux has CTS issues on iOS)
@@ -1628,7 +1617,6 @@ async function processVideoInBackground(){
       // ── Path A: iOS → Cloudinary only ──
       // WhatsApp iOS re-encodes all videos. Cloudinary fMP4 output is fine.
       setConv(5,'Uploading\u2026');
-      window._rcDiag.pipeline='ios-cloudinary';
       const uploadResult=await uploadToCloudinary(finalBlob);
       if(uploadResult.delete_token) _cdDeleteToken=uploadResult.delete_token;
       setConv(80,'Converting\u2026');
@@ -1640,16 +1628,12 @@ async function processVideoInBackground(){
       if(!resp.ok) throw new Error('mp4 fetch HTTP '+resp.status);
       mp4Blob=await resp.blob();
       clearTimeout(fetchTimer);
-      window._rcDiag.mp4BlobSize=mp4Blob.size;
-      window._rcDiag.pipelineResult='ok';
     } else {
       // ── Path B: Android/Desktop → Cloudinary + client-side remux ──
       // Step 1: Upload WebM to Cloudinary (server-side VP9→H264 transcode)
       setConv(5,'Uploading\u2026');
-      window._rcDiag.pipeline='cloud+remux';
       const uploadResult=await uploadToCloudinary(finalBlob);
       if(uploadResult.delete_token) _cdDeleteToken=uploadResult.delete_token;
-      console.log('[RC] upload OK bytes='+uploadResult.bytes);
 
       // Step 2: Fetch Cloudinary's fMP4 output (H264+AAC but fragmented)
       setConv(70,'Converting\u2026');
@@ -1661,25 +1645,17 @@ async function processVideoInBackground(){
       if(!resp.ok) throw new Error('mp4 fetch HTTP '+resp.status);
       const fmp4Blob=await resp.blob();
       clearTimeout(fetchTimer);
-      console.log('[RC] cloudinary fMP4 size='+fmp4Blob.size);
-
       // Step 3: Client-side remux fMP4 → flat MP4 (WhatsApp Android needs flat MP4)
       setConv(85,'Optimising\u2026');
       const _timeout=new Promise((_,r)=>setTimeout(()=>r(new Error('remux timeout')),15000));
       mp4Blob=await Promise.race([remuxToFlatMp4(fmp4Blob),_timeout]);
-      window._rcDiag.mp4BlobSize=mp4Blob.size;
-      window._rcDiag.pipelineResult='ok';
-      console.log('[RC] remux OK size='+mp4Blob.size);
     }
   }catch(e){
-    console.log('[RC] pipeline FAILED:',e.message);
-    window._rcDiag.pipelineResult='fail:'+e.message;
     mp4Blob=null;
     uploadFailed=true;
   }
 
   clearTimeout(processingGuard);
-  console.log('[RC:DIAG] '+JSON.stringify(window._rcDiag));
   if(isOnDone()) enableDownloadButton();
 }
 
@@ -1719,7 +1695,6 @@ async function shareOrDownload(){
       }catch(e){
         if(e.name==='AbortError') return;
         // NotAllowedError, TypeError, share-timeout → fall through to download
-        window._rcDiag.shareError=e.name+':'+e.message;
       }
     }
 

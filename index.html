@@ -523,6 +523,7 @@ let finalBlob=null;
 let _cdDeleteToken=null; // kept private — not on window
 let countdownActive=false, countdownText='';
 let challengeElapsed=0, mp4Blob=null, uploadFailed=false, nativeMp4=false;
+let processingGuard=null; // safety timer — rescues "Preparing…" if all else fails
 let endCardActive=false, endCardStart=0;
 let slotOffset=0, cachedGrads={}, lastDrawTime=0;
 let slotSpinning=false, ragaRevealAt=0, ragaRevealName='';
@@ -1181,6 +1182,9 @@ function stopRecording(onStopped){
   captureTrack=null; // release frame-capture reference
   document.getElementById('rec-badge').classList.remove('visible');
   mediaRecorder.onstop=()=>{ onStopped&&onStopped(); };
+  // Resume before stopping — calling stop() on a paused recorder may not fire onstop
+  // on some Android Chrome versions (e.g. if screen dimmed mid-recording)
+  if(mediaRecorder.state==='paused') mediaRecorder.resume();
   mediaRecorder.stop();
 }
 
@@ -1257,6 +1261,17 @@ function showResultsScreen(){
     btn.innerHTML='<span id="dl-label"><i class="ph-bold ph-circle-notch spin-icon"></i> Preparing…</span><span class="btn-progress" id="btn-progress"></span>';
     btn.classList.add('processing');
     btn.disabled=true;
+    // Safety net: if processing never completes (onstop hangs, silent network error, etc.)
+    // rescue the button after 120s so the user is never permanently stuck
+    clearTimeout(processingGuard);
+    processingGuard=setTimeout(()=>{
+      const b=document.getElementById('dl-btn');
+      if(b&&b.classList.contains('processing')){
+        b.classList.remove('processing');
+        if(finalBlob){ b.innerHTML='<i class="ph-bold ph-download-simple"></i> Save Video'; b.disabled=false; }
+        else { b.innerHTML='Recording unavailable'; b.disabled=true; }
+      }
+    },120000);
   }
 }
 
@@ -1293,6 +1308,7 @@ function logSession(){
 }
 
 function enableDownloadButton(){
+  clearTimeout(processingGuard);
   const btn=document.getElementById('dl-btn');
   const pb=document.getElementById('btn-progress');
   if(pb){ pb.style.width='100%'; }
@@ -1307,6 +1323,7 @@ const CLOUDINARY_PRESET='forRagaChallange';
 let mp4Url=null;
 
 function skipToWebm(){
+  clearTimeout(processingGuard);
   const btn=document.getElementById('dl-btn');
   btn.classList.remove('processing');
   btn.innerHTML='<i class="ph-bold ph-download-simple"></i> Save WebM';
@@ -1318,6 +1335,9 @@ function skipToWebm(){
 async function processVideoInBackground(){
   if(chunks.length===0){
     uploadFailed=true;
+    clearTimeout(processingGuard);
+    const btn=document.getElementById('dl-btn');
+    if(btn){ btn.classList.remove('processing'); btn.innerHTML='Recording unavailable'; btn.disabled=true; }
     return;
   }
   uploadFailed=false;
@@ -1388,6 +1408,7 @@ async function processVideoInBackground(){
 
   }catch(e){
     clearTimeout(skipTimer);
+    clearTimeout(processingGuard);
     uploadFailed=true;
     mp4Url=null; mp4Blob=null;
     if(isOnDone()){
@@ -1592,6 +1613,7 @@ async function inviteFriend(){
 }
 
 function restart(){
+  clearTimeout(processingGuard);
   if(mediaStream){ mediaStream.getTracks().forEach(t=>t.stop()); mediaStream=null; }
   document.getElementById('preview-video').srcObject=null;
   document.getElementById('video-bg').srcObject=null;

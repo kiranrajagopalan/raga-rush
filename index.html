@@ -512,7 +512,7 @@ function modeLabel(){ return {easy:'Easy',notSoEasy:'Not So Easy',surpriseMe:'Su
 // ── Feedback analytics endpoint (optional Google Sheets logger) ──
 // Setup: Extensions → Apps Script → paste doPost handler → Deploy as web app (Anyone) → paste URL here
 const SHEETS_ENDPOINT = 'https://script.google.com/macros/s/AKfycbx6S-nn5jBqF3ZaYACvM-Cq_7fn9WPv7Yhyikph3F_0QhZcp4Q6FHFK6DbGQ47FiGJ1/exec';
-const APP_BUILD = '20260328-b19'; // bump this on every push so Sheets confirms which build you're testing
+const APP_BUILD = '20260328-b20'; // bump this on every push so Sheets confirms which build you're testing
 const CLOUDINARY_CLOUD = 'dfstch1ag';
 const CLOUDINARY_PRESET = 'forRagaChallange';
 const CLOUDINARY_UPLOAD_URL = 'https://api.cloudinary.com/v1_1/dfstch1ag/video/upload';
@@ -1390,6 +1390,94 @@ function cleanupCloudinary(){
   }).catch(()=>{}); // fire and forget
 }
 
+// Move MOOV atom before MDAT for WhatsApp Android compatibility (faststart).
+// WhatsApp Android rejects MP4 files where moov is at the end because its
+// progressive validator needs metadata first. This is a pure binary rewrite —
+// no re-encoding, no dependencies. ~O(filesize) memory + one pass.
+async function ensureFastStart(blob){
+  const buf=await blob.arrayBuffer();
+  const view=new DataView(buf);
+  const boxes=[];
+  let offset=0;
+  // Parse top-level MP4 boxes
+  while(offset<buf.byteLength-8){
+    const size=view.getUint32(offset);
+    const type=String.fromCharCode(view.getUint8(offset+4),view.getUint8(offset+5),view.getUint8(offset+6),view.getUint8(offset+7));
+    if(size<8) break; // invalid box
+    boxes.push({type,offset,size});
+    offset+=size;
+  }
+  const moov=boxes.find(b=>b.type==='moov');
+  const mdat=boxes.find(b=>b.type==='mdat');
+  if(!moov||!mdat){
+    window._rcDiag.moovPosition='missing';
+    return blob; // can't fix, return as-is
+  }
+  if(moov.offset<mdat.offset){
+    window._rcDiag.moovPosition='already-faststart';
+    return blob; // already faststart
+  }
+  // moov is after mdat — need to move it before mdat
+  window._rcDiag.moovPosition='fixed';
+  const moovData=new Uint8Array(buf,moov.offset,moov.size);
+  // Adjust stco/co64 chunk offsets inside moov (they point into mdat)
+  // Every absolute offset increases by moov.size because we're inserting moov before mdat
+  const delta=moov.size;
+  const moovBuf=new ArrayBuffer(moov.size);
+  new Uint8Array(moovBuf).set(moovData);
+  const mv=new DataView(moovBuf);
+  // Recursively scan moov for stco and co64 boxes
+  function fixOffsets(start,end){
+    let pos=start;
+    while(pos<end-8){
+      const sz=mv.getUint32(pos);
+      const t=String.fromCharCode(mv.getUint8(pos+4),mv.getUint8(pos+5),mv.getUint8(pos+6),mv.getUint8(pos+7));
+      if(sz<8||pos+sz>end) break;
+      if(t==='stco'){
+        const count=mv.getUint32(pos+12);
+        for(let i=0;i<count;i++){
+          const o=pos+16+i*4;
+          mv.setUint32(o,mv.getUint32(o)+delta);
+        }
+      }else if(t==='co64'){
+        const count=mv.getUint32(pos+12);
+        for(let i=0;i<count;i++){
+          const o=pos+16+i*8;
+          // Read as two 32-bit values (hi+lo) since DataView doesn't have getUint64
+          const hi=mv.getUint32(o);
+          const lo=mv.getUint32(o+4);
+          const val=hi*0x100000000+lo+delta;
+          mv.setUint32(o,Math.floor(val/0x100000000));
+          mv.setUint32(o+4,val>>>0);
+        }
+      }else if(t==='trak'||t==='mdia'||t==='minf'||t==='stbl'){
+        fixOffsets(pos+8,pos+sz); // recurse into container boxes
+      }
+      pos+=sz;
+    }
+  }
+  fixOffsets(0,moov.size);
+  // Rebuild: everything before mdat + moov + mdat + everything after mdat (except old moov)
+  const parts=[];
+  // Boxes before mdat (ftyp, etc.)
+  for(const b of boxes){
+    if(b.type==='mdat') break;
+    if(b.type==='moov') continue; // skip old moov position
+    parts.push(new Uint8Array(buf,b.offset,b.size));
+  }
+  // Insert moov before mdat
+  parts.push(new Uint8Array(moovBuf));
+  // mdat
+  parts.push(new Uint8Array(buf,mdat.offset,mdat.size));
+  // Anything after mdat that isn't moov
+  for(const b of boxes){
+    if(b.offset<=mdat.offset) continue;
+    if(b.type==='moov') continue;
+    parts.push(new Uint8Array(buf,b.offset,b.size));
+  }
+  return new Blob(parts,{type:'video/mp4'});
+}
+
 async function processVideoInBackground(){
   if(processingStarted) return;
   processingStarted=true;
@@ -1418,15 +1506,19 @@ async function processVideoInBackground(){
 
     // Phase 2: Fetch converted flat MP4 back
     setConv(80,'Converting\u2026');
-    const mp4Url=uploadResult.secure_url.replace(/\/upload\//,'/upload/f_mp4,vc_h264,ac_aac,af_44100/').replace(/\.[^.]+$/,'.mp4');
+    const mp4Url=uploadResult.secure_url.replace(/\/upload\//,'/upload/f_mp4,vc_h264:baseline:3.1,ac_aac,af_44100/').replace(/\.[^.]+$/,'.mp4');
     const fetchAbort=new AbortController();
     const fetchTimer=setTimeout(()=>fetchAbort.abort(),40000);
     const resp=await fetch(mp4Url,{signal:fetchAbort.signal});
     if(!resp.ok) throw new Error('mp4 fetch HTTP '+resp.status);
-    mp4Blob=await resp.blob();
+    let rawMp4=await resp.blob();
     clearTimeout(fetchTimer);
-    window._rcDiag.mp4BlobSize=mp4Blob.size;
+    window._rcDiag.mp4BlobSizeRaw=rawMp4.size;
     window._rcDiag.mp4ContentType=resp.headers.get('content-type');
+    // Ensure moov atom is before mdat (faststart) — required by WhatsApp Android
+    setConv(90,'Optimising\u2026');
+    mp4Blob=await ensureFastStart(rawMp4);
+    window._rcDiag.mp4BlobSize=mp4Blob.size;
     // Verify first 8 bytes — valid MP4 has 'ftyp' at offset 4
     const _peek=new Uint8Array(await mp4Blob.slice(0,8).arrayBuffer());
     window._rcDiag.mp4Header=Array.from(_peek).map(b=>b.toString(16).padStart(2,'0')).join(' ');

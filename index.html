@@ -515,7 +515,7 @@ function modeLabel(){ return {easy:'Easy',notSoEasy:'Not So Easy',surpriseMe:'Su
 // ── Feedback analytics endpoint (optional Google Sheets logger) ──
 // Setup: Extensions → Apps Script → paste doPost handler → Deploy as web app (Anyone) → paste URL here
 const SHEETS_ENDPOINT = 'https://script.google.com/macros/s/AKfycbx6S-nn5jBqF3ZaYACvM-Cq_7fn9WPv7Yhyikph3F_0QhZcp4Q6FHFK6DbGQ47FiGJ1/exec';
-const APP_BUILD = '20260328-b25'; // bump this on every push so Sheets confirms which build you're testing
+const APP_BUILD = '20260328-b26'; // bump this on every push so Sheets confirms which build you're testing
 const CLOUDINARY_CLOUD = 'dfstch1ag';
 const CLOUDINARY_PRESET = 'forRagaChallange';
 const CLOUDINARY_UPLOAD_URL = 'https://api.cloudinary.com/v1_1/dfstch1ag/video/upload';
@@ -1476,9 +1476,10 @@ function remuxToFlatMp4(fmp4Blob){
             trackMeta[track.id]={track,entry:trak.mdia.minf.stbl.stsd.entries[0]};
             inFile.setExtractionOptions(track.id,null,{nbSamples:Infinity});
           });
+          inFile.seek(0); // Reset read position — critical for fMP4 sample extraction
           inFile.start();
-          // Safety: build after 500ms regardless (handles nb_samples=0 in fMP4)
-          buildTimer=setTimeout(buildFlatMp4, 500);
+          // Safety: build after 1000ms regardless
+          buildTimer=setTimeout(buildFlatMp4, 1000);
         };
 
         // Collect samples. Debounce: build 100ms after last batch.
@@ -1490,7 +1491,8 @@ function remuxToFlatMp4(fmp4Blob){
         };
 
         const buf=ab.slice(0); buf.fileStart=0;
-        inFile.appendBuffer(buf);
+        const nextPos=inFile.appendBuffer(buf);
+        console.log('[RC] mp4box appendBuffer returned nextPos='+nextPos+' bufLen='+buf.byteLength);
         inFile.flush();
       }catch(e){ reject(e); }
     }).catch(reject);

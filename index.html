@@ -9,7 +9,6 @@
 <title>Raga Challenge</title>
 <link href="https://fonts.googleapis.com/css2?family=Cormorant+Garamond:ital,wght@0,600;0,700;1,600&family=DM+Sans:opsz,wght@9..40,400;9..40,500;9..40,600;9..40,700&display=swap" rel="stylesheet">
 <script src="https://unpkg.com/@phosphor-icons/web@2.1.1"></script>
-<script src="https://cdn.jsdelivr.net/npm/mp4box@0.5.2/dist/mp4box.all.min.js"></script>
 <script src="https://cdn.jsdelivr.net/npm/mp4-muxer@5.2.2/build/mp4-muxer.min.js"></script>
 <style>
 *, *::before, *::after { box-sizing: border-box; margin: 0; padding: 0; }
@@ -515,7 +514,7 @@ function modeLabel(){ return {easy:'Easy',notSoEasy:'Not So Easy',surpriseMe:'Su
 // ── Feedback analytics endpoint (optional Google Sheets logger) ──
 // Setup: Extensions → Apps Script → paste doPost handler → Deploy as web app (Anyone) → paste URL here
 const SHEETS_ENDPOINT = 'https://script.google.com/macros/s/AKfycbx6S-nn5jBqF3ZaYACvM-Cq_7fn9WPv7Yhyikph3F_0QhZcp4Q6FHFK6DbGQ47FiGJ1/exec';
-const APP_BUILD = '20260328-b26'; // bump this on every push so Sheets confirms which build you're testing
+const APP_BUILD = '20260328-b27'; // bump this on every push so Sheets confirms which build you're testing
 const CLOUDINARY_CLOUD = 'dfstch1ag';
 const CLOUDINARY_PRESET = 'forRagaChallange';
 const CLOUDINARY_UPLOAD_URL = 'https://api.cloudinary.com/v1_1/dfstch1ag/video/upload';
@@ -1400,102 +1399,178 @@ function cleanupCloudinary(){
   }).catch(()=>{}); // fire and forget
 }
 
-// Remux fragmented MP4 → flat MP4 using mp4box.js (parser) + mp4-muxer (writer).
-// Cloudinary's on-the-fly transform outputs fMP4 (fragmented) with H264 High profile
-// which WhatsApp Android rejects. Client-side remux produces flat MP4 that works everywhere.
-// Proven on Chrome in b11. iOS uses Cloudinary path (WhatsApp iOS re-encodes anyway).
+// Custom fMP4 → flat MP4 remuxer. Parses fMP4 binary directly (no mp4box.js).
+// Uses mp4-muxer for flat MP4 output. ~150 lines, zero external parser dependency.
 function remuxToFlatMp4(fmp4Blob){
-  return new Promise((resolve,reject)=>{
-    fmp4Blob.arrayBuffer().then(ab=>{
-      try{
-        const inFile=MP4Box.createFile();
-        const allSamples={};
-        const trackMeta={};
-        let built=false;
-        let buildTimer=null;
+  return fmp4Blob.arrayBuffer().then(ab=>{
+    const dv=new DataView(ab);
+    const u8=new Uint8Array(ab);
+    const s4=(o)=>String.fromCharCode(u8[o],u8[o+1],u8[o+2],u8[o+3]);
 
-        function buildFlatMp4(){
-          if(built) return;
-          built=true;
-          clearTimeout(buildTimer);
-          try{
-            const videoId=Object.keys(trackMeta).find(id=>trackMeta[id].track.type==='video');
-            const audioId=Object.keys(trackMeta).find(id=>trackMeta[id].track.type==='audio');
-            const vMeta=videoId?trackMeta[videoId]:null;
-            const aMeta=audioId?trackMeta[audioId]:null;
-            const vCount=videoId?allSamples[videoId].length:0;
-            const aCount=audioId?allSamples[audioId].length:0;
-            console.log('[RC] remux building: video='+vCount+' audio='+aCount);
-            if(vCount===0){ reject(new Error('remux: 0 video samples')); return; }
+    // Parse boxes at a given level
+    function boxes(start,end){
+      const r=[];let p=start;
+      while(p<end-7){const sz=dv.getUint32(p);if(sz<8||p+sz>end)break;r.push({t:s4(p+4),o:p,s:sz});p+=sz;}
+      return r;
+    }
+    function findBox(list,type){return list.find(b=>b.t===type);}
+    function kids(b){return boxes(b.o+8,b.o+b.s);}
 
-            const mxOpts={
-              target:new Mp4Muxer.ArrayBufferTarget(),
-              fastStart:'in-memory',
-              firstTimestampBehavior:'offset'
-            };
-            if(vMeta) mxOpts.video={codec:'avc',width:vMeta.track.video.width,height:vMeta.track.video.height};
-            if(aMeta&&aCount>0) mxOpts.audio={codec:'aac',numberOfChannels:aMeta.track.audio.channel_count,sampleRate:aMeta.track.audio.sample_rate};
+    // Find a box type within a byte range
+    function findInRange(start,end,type){
+      let p=start;
+      while(p<end-7){const sz=dv.getUint32(p);if(sz<8)break;if(s4(p+4)===type)return{o:p,s:sz};p+=sz;}
+      return null;
+    }
 
-            const muxer=new Mp4Muxer.Muxer(mxOpts);
-
-            if(vMeta){
-              const c=vMeta.entry.avcC;
-              const desc=ab.slice(c.start+c.hdr_size,c.start+c.size);
-              const ts=vMeta.track.timescale;
-              allSamples[videoId].forEach((s,i)=>muxer.addVideoChunkRaw(
-                s.data, s.is_sync?'key':'delta',
-                Math.round((s.cts/ts)*1e6),
-                Math.round((s.duration/ts)*1e6),
-                i===0?{decoderConfig:{description:desc}}:undefined
-              ));
-            }
-            if(aMeta&&aCount>0){
-              const d=aMeta.entry.esds.esd.descs[0].descs[0].data;
-              const asc=new Uint8Array(Object.keys(d).length);
-              for(let i=0;i<asc.length;i++) asc[i]=d[i];
-              const ts=aMeta.track.timescale;
-              allSamples[audioId].forEach((s,i)=>muxer.addAudioChunkRaw(
-                s.data,'key',
-                Math.round((s.cts/ts)*1e6),
-                Math.round((s.duration/ts)*1e6),
-                i===0?{decoderConfig:{description:asc.buffer}}:undefined
-              ));
-            }
-            muxer.finalize();
-            resolve(new Blob([muxer.target.buffer],{type:'video/mp4'}));
-          }catch(e2){ reject(e2); }
+    // Find ESDS AudioSpecificConfig (descriptor tag 0x05)
+    function findASC(esdsOff,esdsEnd){
+      for(let p=esdsOff;p<esdsEnd-2;p++){
+        if(u8[p]===0x05){
+          let lp=p+1,len=0;
+          for(let i=0;i<4&&lp<esdsEnd;i++){const b=u8[lp++];len=(len<<7)|(b&0x7F);if(!(b&0x80))break;}
+          if(len>0&&lp+len<=esdsEnd) return u8.slice(lp,lp+len);
         }
+      }
+      return null;
+    }
 
-        inFile.onError=e=>reject(new Error('mp4box:'+e));
+    const top=boxes(0,ab.byteLength);
+    const moov=findBox(top,'moov');
+    if(!moov) throw new Error('remux: no moov box');
 
-        inFile.onReady=info=>{
-          console.log('[RC] mp4box onReady: tracks='+info.tracks.length+' nb_samples='+info.tracks.map(t=>t.nb_samples).join(','));
-          info.tracks.forEach(track=>{
-            allSamples[track.id]=[];
-            const trak=inFile.getTrackById(track.id);
-            trackMeta[track.id]={track,entry:trak.mdia.minf.stbl.stsd.entries[0]};
-            inFile.setExtractionOptions(track.id,null,{nbSamples:Infinity});
-          });
-          inFile.seek(0); // Reset read position — critical for fMP4 sample extraction
-          inFile.start();
-          // Safety: build after 1000ms regardless
-          buildTimer=setTimeout(buildFlatMp4, 1000);
-        };
+    // Parse tracks from moov
+    const tracks={};
+    for(const trak of kids(moov).filter(b=>b.t==='trak')){
+      const tk=kids(trak);
+      const tkhd=findBox(tk,'tkhd');
+      const v=u8[tkhd.o+8]; // version
+      const tid=dv.getUint32(tkhd.o+(v===0?20:28));
+      const wOff=v===0?84:96;
+      const w=dv.getUint32(tkhd.o+wOff)>>>16;
+      const h=dv.getUint32(tkhd.o+wOff+4)>>>16;
 
-        // Collect samples. Debounce: build 100ms after last batch.
-        inFile.onSamples=(id,user,samples)=>{
-          allSamples[id].push(...samples);
-          if(built) return;
-          clearTimeout(buildTimer);
-          buildTimer=setTimeout(buildFlatMp4, 100);
-        };
+      const mdia=findBox(tk,'mdia');
+      const mdiaK=kids(mdia);
+      const mdhd=findBox(mdiaK,'mdhd');
+      const mv=u8[mdhd.o+8];
+      const timescale=dv.getUint32(mdhd.o+(mv===0?20:28));
 
-        const buf=ab.slice(0); buf.fileStart=0;
-        const nextPos=inFile.appendBuffer(buf);
-        console.log('[RC] mp4box appendBuffer returned nextPos='+nextPos+' bufLen='+buf.byteLength);
-        inFile.flush();
-      }catch(e){ reject(e); }
-    }).catch(reject);
+      const hdlr=findBox(mdiaK,'hdlr');
+      const htype=s4(hdlr.o+16); // handler_type at offset 8+4+4=16
+
+      const minf=findBox(mdiaK,'minf');
+      const stbl=findBox(kids(minf),'stbl');
+      const stsd=findBox(kids(stbl),'stsd');
+      // First sample entry at stsd.o+16
+      const eOff=stsd.o+16;
+      const eSz=dv.getUint32(eOff);
+
+      const info={id:tid,type:htype==='vide'?'video':'audio',timescale,w,h};
+
+      if(htype==='vide'){
+        // avc1: sub-boxes start at entry+86
+        const avcC=findInRange(eOff+86,eOff+eSz,'avcC');
+        if(avcC) info.codecData=u8.slice(avcC.o+8,avcC.o+avcC.s);
+      }else if(htype==='soun'){
+        info.ch=dv.getUint16(eOff+24);
+        info.sr=dv.getUint32(eOff+32)>>>16;
+        // esds sub-box starts at entry+36
+        const esds=findInRange(eOff+36,eOff+eSz,'esds');
+        if(esds) info.codecData=findASC(esds.o+12,esds.o+esds.s);
+      }
+      tracks[tid]=info;
+    }
+
+    // Parse moof+mdat pairs for samples
+    const samples={};
+    for(const tid in tracks) samples[tid]=[];
+
+    for(let i=0;i<top.length;i++){
+      if(top[i].t!=='moof') continue;
+      const mdat=top[i+1];
+      if(!mdat||mdat.t!=='mdat') continue;
+      const moofOff=top[i].o;
+
+      for(const traf of kids(top[i]).filter(b=>b.t==='traf')){
+        const trafK=kids(traf);
+        const tfhd=findBox(trafK,'tfhd');
+        const trun=findBox(trafK,'trun');
+        if(!tfhd||!trun) continue;
+
+        // tfhd
+        const tfFlags=(u8[tfhd.o+9]<<16)|(u8[tfhd.o+10]<<8)|u8[tfhd.o+11];
+        const tfTid=dv.getUint32(tfhd.o+12);
+        let fp=tfhd.o+16;
+        if(tfFlags&0x01) fp+=8; // base_data_offset
+        if(tfFlags&0x02) fp+=4; // sample_description_index
+        let defDur=0,defSz=0,defFl=0;
+        if(tfFlags&0x08){defDur=dv.getUint32(fp);fp+=4;}
+        if(tfFlags&0x10){defSz=dv.getUint32(fp);fp+=4;}
+        if(tfFlags&0x20){defFl=dv.getUint32(fp);fp+=4;}
+
+        // trun
+        const trFlags=(u8[trun.o+9]<<16)|(u8[trun.o+10]<<8)|u8[trun.o+11];
+        const count=dv.getUint32(trun.o+12);
+        let tp=trun.o+16;
+        let dataOff=0;
+        if(trFlags&0x01){dataOff=dv.getInt32(tp);tp+=4;}
+        let firstFlags=0;
+        if(trFlags&0x04){firstFlags=dv.getUint32(tp);tp+=4;}
+
+        let sOff=moofOff+dataOff; // data_offset relative to moof start
+        for(let s=0;s<count;s++){
+          let dur=defDur,sz=defSz,fl=defFl,cts=0;
+          if(trFlags&0x100){dur=dv.getUint32(tp);tp+=4;}
+          if(trFlags&0x200){sz=dv.getUint32(tp);tp+=4;}
+          if(trFlags&0x400){fl=dv.getUint32(tp);tp+=4;}
+          if(trFlags&0x800){cts=dv.getInt32(tp);tp+=4;}
+          if(s===0&&(trFlags&0x04)) fl=firstFlags;
+          const isSync=!(fl&0x10000);
+          if(sz>0&&sOff+sz<=ab.byteLength){
+            samples[tfTid].push({data:new Uint8Array(ab,sOff,sz),dur,isSync,cts});
+          }
+          sOff+=sz;
+        }
+      }
+    }
+
+    // Log what we found
+    const vId=Object.keys(tracks).find(id=>tracks[id].type==='video');
+    const aId=Object.keys(tracks).find(id=>tracks[id].type==='audio');
+    const vSamp=vId?samples[vId]:[];
+    const aSamp=aId?samples[aId]:[];
+    console.log('[RC] fMP4 parsed: tracks='+Object.keys(tracks).length+' vSamples='+vSamp.length+' aSamples='+aSamp.length);
+    if(vSamp.length===0) throw new Error('remux: 0 video samples ('+Object.keys(tracks).length+' tracks, moofs='+top.filter(b=>b.t==='moof').length+')');
+
+    // Mux to flat MP4 via mp4-muxer
+    const vT=tracks[vId];
+    const aT=aId?tracks[aId]:null;
+    const opts={target:new Mp4Muxer.ArrayBufferTarget(),fastStart:'in-memory',firstTimestampBehavior:'offset'};
+    opts.video={codec:'avc',width:vT.w,height:vT.h};
+    if(aT&&aSamp.length>0) opts.audio={codec:'aac',numberOfChannels:aT.ch,sampleRate:aT.sr};
+
+    const mux=new Mp4Muxer.Muxer(opts);
+    let vTime=0;
+    vSamp.forEach((s,i)=>{
+      const ts=vT.timescale;
+      mux.addVideoChunkRaw(s.data,s.isSync?'key':'delta',
+        Math.round(((vTime+s.cts)/ts)*1e6),Math.round((s.dur/ts)*1e6),
+        i===0?{decoderConfig:{description:vT.codecData}}:undefined);
+      vTime+=s.dur;
+    });
+    if(aT&&aSamp.length>0){
+      let aTime=0;
+      aSamp.forEach((s,i)=>{
+        const ts=aT.timescale;
+        mux.addAudioChunkRaw(s.data,'key',
+          Math.round((aTime/ts)*1e6),Math.round((s.dur/ts)*1e6),
+          i===0?{decoderConfig:{description:aT.codecData.buffer||aT.codecData}}:undefined);
+        aTime+=s.dur;
+      });
+    }
+    mux.finalize();
+    return new Blob([mux.target.buffer],{type:'video/mp4'});
   });
 }
 

@@ -513,7 +513,7 @@ function modeLabel(){ return {easy:'Easy',notSoEasy:'Not So Easy',surpriseMe:'Su
 // ── Feedback analytics endpoint (optional Google Sheets logger) ──
 // Setup: Extensions → Apps Script → paste doPost handler → Deploy as web app (Anyone) → paste URL here
 const SHEETS_ENDPOINT = 'https://script.google.com/macros/s/AKfycbx6S-nn5jBqF3ZaYACvM-Cq_7fn9WPv7Yhyikph3F_0QhZcp4Q6FHFK6DbGQ47FiGJ1/exec';
-const APP_BUILD = '20260327-b3'; // bump this on every push so Sheets confirms which build you're testing
+const APP_BUILD = '20260327-b4'; // bump this on every push so Sheets confirms which build you're testing
 
 let difficulty='easy', timePerRaga=8, ragaCount=10;
 let lastSurpriseThemeIdx=-1, activeTheme=null;
@@ -1198,9 +1198,13 @@ function stopRecording(onStopped){
   clearInterval(captureHeartbeat); captureHeartbeat=null;
   captureTrack?.requestFrame?.(); // flush final canvas frame before encoder closes
   captureTrack=null;
-  mediaRecorder.onstop=()=>{ onStopped&&onStopped(); };
+  // Guard against onstop never firing (Android Chrome bug with hardware H264 encoder)
+  let _called=false;
+  const _fire=()=>{ if(!_called){ _called=true; onStopped&&onStopped(); } };
+  mediaRecorder.onstop=_fire;
   if(mediaRecorder.state==='paused') mediaRecorder.resume();
-  mediaRecorder.stop();
+  try{ mediaRecorder.stop(); }catch(e){}
+  setTimeout(_fire, 5000); // force-fire after 5s if onstop never comes
 }
 
 function stopChallenge(){ clearInterval(cdInterval); endChallenge(); }
@@ -1276,17 +1280,16 @@ function showResultsScreen(){
     btn.innerHTML='<span id="dl-label"><i class="ph-bold ph-circle-notch spin-icon"></i> Preparing…</span><span class="btn-progress" id="btn-progress"></span>';
     btn.classList.add('processing');
     btn.disabled=true;
-    // Safety net: if processing never completes (onstop hangs, silent network error, etc.)
-    // rescue the button after 120s so the user is never permanently stuck
+    // Safety net: if onstop never fires (Android Chrome H264 encoder bug) this fires
+    // after 30s and force-processes whatever chunks exist, so the user is never stuck
     clearTimeout(processingGuard);
     processingGuard=setTimeout(()=>{
       const b=document.getElementById('dl-btn');
       if(b&&b.classList.contains('processing')){
-        b.classList.remove('processing');
-        if(finalBlob){ b.innerHTML='<i class="ph-bold ph-download-simple"></i> Save Video'; b.disabled=false; }
-        else { b.innerHTML='Recording unavailable'; b.disabled=true; }
+        if(chunks.length>0){ processVideoInBackground(); } // onstop didn't fire — process now
+        else { b.classList.remove('processing'); b.innerHTML='Recording unavailable'; b.disabled=true; }
       }
-    },120000);
+    },30000);
   }
 }
 

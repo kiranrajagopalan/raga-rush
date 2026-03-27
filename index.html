@@ -9,6 +9,7 @@
 <title>Raga Challenge</title>
 <link href="https://fonts.googleapis.com/css2?family=Cormorant+Garamond:ital,wght@0,600;0,700;1,600&family=DM+Sans:opsz,wght@9..40,400;9..40,500;9..40,600;9..40,700&display=swap" rel="stylesheet">
 <script src="https://unpkg.com/@phosphor-icons/web@2.1.1"></script>
+<script src="https://cdn.jsdelivr.net/npm/mp4box@0.5.2/dist/mp4box.all.min.js"></script>
 <style>
 *, *::before, *::after { box-sizing: border-box; margin: 0; padding: 0; }
 :root {
@@ -444,7 +445,6 @@ html, body {
     <!-- Sticky action buttons -->
     <div class="done-actions">
       <button class="download-btn" id="dl-btn" onclick="shareOrDownload()" disabled><i class="ph-bold ph-circle-notch spin-icon"></i> Preparing…</button>
-      <span class="dl-skip-link" id="dl-skip" onclick="skipToWebm()">Skip — Save WebM instead</span>
       <div class="done-secondary-row">
         <button class="invite-btn" onclick="inviteFriend()"><i class="ph ph-link-simple"></i> Invite</button>
         <button class="restart-btn" onclick="restart()"><i class="ph ph-arrow-counter-clockwise"></i> New Challenge</button>
@@ -513,7 +513,7 @@ function modeLabel(){ return {easy:'Easy',notSoEasy:'Not So Easy',surpriseMe:'Su
 // ── Feedback analytics endpoint (optional Google Sheets logger) ──
 // Setup: Extensions → Apps Script → paste doPost handler → Deploy as web app (Anyone) → paste URL here
 const SHEETS_ENDPOINT = 'https://script.google.com/macros/s/AKfycbx6S-nn5jBqF3ZaYACvM-Cq_7fn9WPv7Yhyikph3F_0QhZcp4Q6FHFK6DbGQ47FiGJ1/exec';
-const APP_BUILD = '20260327-b5'; // bump this on every push so Sheets confirms which build you're testing
+const APP_BUILD = '20260327-b6'; // bump this on every push so Sheets confirms which build you're testing
 
 let difficulty='easy', timePerRaga=8, ragaCount=10;
 let lastSurpriseThemeIdx=-1, activeTheme=null;
@@ -524,7 +524,7 @@ let sessionPlayCount=parseInt(localStorage.getItem('rc_play_count')||'0');
 let sessionId='';
 let recCanvas=null, recCtx=null, drawRunning=false;
 let finalBlob=null;
-let _cdDeleteToken=null; // kept private — not on window
+// _cdDeleteToken removed — Cloudinary deleted
 let countdownActive=false, countdownText='';
 let challengeElapsed=0, mp4Blob=null, uploadFailed=false, nativeMp4=false;
 let processingGuard=null; // safety timer — rescues "Preparing…" if all else fails
@@ -828,7 +828,9 @@ function startRecording(){
   const mimes=['video/mp4;codecs=h264,aac','video/mp4','video/webm;codecs=vp9,opus','video/webm;codecs=vp8,opus','video/webm'];
   const mime=mimes.find(m=>MediaRecorder.isTypeSupported(m))||'video/webm';
   nativeMp4=mime.startsWith('video/mp4');
-  mediaRecorder=new MediaRecorder(cs,{mimeType:mime,videoBitsPerSecond:5000000,audioBitsPerSecond:128000});
+  // Halve bitrate on mobile — same quality at phone resolutions, significantly less encoder heat
+const isMobile=/Mobi|Android/i.test(navigator.userAgent);
+mediaRecorder=new MediaRecorder(cs,{mimeType:mime,videoBitsPerSecond:isMobile?2500000:5000000,audioBitsPerSecond:128000});
   mediaRecorder.ondataavailable=e=>{ if(e.data.size>0) chunks.push(e.data); };
   isRecording=true; drawRunning=true; lastDrawTime=0;
   slotSpinning=false; ragaRevealAt=0; ragaRevealName='';
@@ -1337,18 +1339,56 @@ function enableDownloadButton(){
   btn.disabled=false;
 }
 
-const CLOUDINARY_CLOUD='dfstch1ag';
-const CLOUDINARY_PRESET='forRagaChallange';
-let mp4Url=null;
+// Remux fragmented MP4 (fMP4) from MediaRecorder into standard non-fragmented MP4.
+// Runs entirely in the browser via mp4box.js — no server, no credits, unlimited scale.
+// fMP4 uses moof+mdat fragments; WhatsApp's ExoPlayer needs a traditional moov structure.
+function remuxToMp4(fmp4Blob){
+  return new Promise((resolve,reject)=>{
+    fmp4Blob.arrayBuffer().then(ab=>{
+      try{
+        ab.fileStart=0;
+        const inFile=MP4Box.createFile();
+        const outFile=MP4Box.createFile();
+        const trackMap={};
 
-function skipToWebm(){
-  clearTimeout(processingGuard);
-  const btn=document.getElementById('dl-btn');
-  btn.classList.remove('processing');
-  btn.innerHTML='<i class="ph-bold ph-download-simple"></i> Save WebM';
-  btn.disabled=false;
-  document.getElementById('dl-skip').style.display='none';
-  mp4Url=null; mp4Blob=null;
+        inFile.onReady=info=>{
+          let remaining=info.tracks.length;
+
+          info.tracks.forEach(track=>{
+            const trak=inFile.getTrackById(track.id);
+            const opts={timescale:track.timescale};
+            if(track.type==='video'){
+              opts.type='avc1'; opts.width=track.video.width; opts.height=track.video.height;
+              opts.description=trak.mdia.minf.stbl.stsd.entries[0];
+            } else {
+              opts.type='mp4a'; opts.samplerate=track.audio.sample_rate;
+              opts.channel_count=track.audio.channel_count;
+              opts.description=trak.mdia.minf.stbl.stsd.entries[0];
+            }
+            trackMap[track.id]=outFile.addTrack(opts);
+            inFile.setExtractionOptions(track.id,null,{nbSamples:Infinity});
+          });
+
+          // onSamples is a single global callback — fires per-track, id identifies which
+          inFile.onSamples=(id,user,samples)=>{
+            const outId=trackMap[id];
+            if(!outId) return;
+            samples.forEach(s=>outFile.addSample(outId,s.data,{
+              duration:s.duration,cts:s.cts,dts:s.dts,is_sync:s.is_sync
+            }));
+            if(--remaining<=0){
+              try{ resolve(new Blob([outFile.getBuffer()],{type:'video/mp4'})); }
+              catch(e){ reject(e); }
+            }
+          };
+          inFile.start();
+        };
+        inFile.onError=e=>reject(new Error('mp4box: '+e));
+        inFile.appendBuffer(ab);
+        inFile.flush();
+      }catch(e){ reject(e); }
+    }).catch(reject);
+  });
 }
 
 async function processVideoInBackground(){
@@ -1360,76 +1400,24 @@ async function processVideoInBackground(){
     return;
   }
   uploadFailed=false;
-
-  // Always go through Cloudinary — raw MediaRecorder output (fMP4 or WebM) is not
-  // reliably playable in WhatsApp/social apps. Cloudinary outputs standard muxed MP4.
   finalBlob=new Blob(chunks,{type:mime});
-
   const isOnDone=()=>document.getElementById('done-screen').classList.contains('active');
 
-  setConv(5,'Uploading video…');
-
-  const skipTimer=setTimeout(()=>{
-    if(isOnDone()) document.getElementById('dl-skip').style.display='block';
-  }, 8000);
-
-  try{
-    const fd=new FormData();
-    fd.append('file', finalBlob, nativeMp4 ? 'raga.mp4' : 'raga.webm');
-    fd.append('upload_preset', CLOUDINARY_PRESET);
-
-    const xhr=new XMLHttpRequest();
-    xhr.open('POST','https://api.cloudinary.com/v1_1/'+CLOUDINARY_CLOUD+'/video/upload');
-
-    xhr.upload.onprogress=e=>{
-      if(e.lengthComputable) setConv(5+Math.round((e.loaded/e.total)*60),'Uploading…');
-    };
-
-    xhr.timeout=90000;
-    const res=await new Promise((resolve,reject)=>{
-      xhr.onload=()=>{
-        try{
-          const data=JSON.parse(xhr.responseText);
-          if(xhr.status===200) resolve(data);
-          else reject(new Error((data.error&&data.error.message)||('HTTP '+xhr.status)));
-        }catch(e){ reject(new Error('Bad response from server')); }
-      };
-      xhr.onerror=()=>reject(new Error('Network error'));
-      xhr.ontimeout=()=>reject(new Error('Upload timed out'));
-      xhr.send(fd);
-    });
-
-    mp4Url=res.secure_url.replace(/\/upload\//, '/upload/f_mp4,vc_h264,ac_aac,af_44100/').replace(/\.[^.]+$/, '.mp4');
-    if(res.delete_token) _cdDeleteToken=res.delete_token;
-
-    // Fetch MP4 blob — Cloudinary transcodes on first request, can be slow on mobile.
-    // AbortController enforces a 40s cap; timeout triggers the catch block → WebM fallback.
-    setConv(70,'Fetching MP4…');
-    const fetchAbort=new AbortController();
-    const fetchTimeout=setTimeout(()=>fetchAbort.abort(),40000);
-    const fetchRes=await fetch(mp4Url,{signal:fetchAbort.signal});
-    mp4Blob=await fetchRes.blob();
-    clearTimeout(fetchTimeout);
-
-    clearTimeout(skipTimer);
-    setConv(100,'Ready!');
-
-    if(isOnDone()){
-      setTimeout(()=>{ enableDownloadButton(); }, 600);
+  if(nativeMp4){
+    // fMP4 → standard MP4 via mp4box.js remux (local, ~1-2s, no server)
+    setConv(30,'Processing…');
+    try{
+      mp4Blob=await remuxToMp4(finalBlob);
+    }catch(e){
+      mp4Blob=finalBlob; // fallback: raw fMP4 (playable in most apps except WhatsApp)
     }
-
-  }catch(e){
-    clearTimeout(skipTimer);
-    clearTimeout(processingGuard);
-    uploadFailed=true;
-    mp4Url=null; mp4Blob=null;
-    if(isOnDone()){
-      const btn=document.getElementById('dl-btn');
-      btn.classList.remove('processing');
-      btn.innerHTML='<i class="ph-bold ph-download-simple"></i> Save WebM';
-      btn.disabled=false;
-    }
+  } else {
+    // WebM (Opus audio): no practical client-side transcode to AAC — download only
+    mp4Blob=null; uploadFailed=true;
   }
+
+  clearTimeout(processingGuard);
+  if(isOnDone()) enableDownloadButton();
 }
 
 function setConv(pct,msg){
@@ -1439,28 +1427,17 @@ function setConv(pct,msg){
   if(pb) pb.style.width=pct+'%';
 }
 
-async function deleteFromCloudinary(){
-  if(!_cdDeleteToken) return;
-  try{
-    await fetch('https://api.cloudinary.com/v1_1/'+CLOUDINARY_CLOUD+'/delete_by_token',{
-      method:'POST',
-      headers:{'Content-Type':'application/json'},
-      body:JSON.stringify({token:_cdDeleteToken})
-    });
-    _cdDeleteToken=null;
-  }catch(e){ /* silent fail — not critical */ }
-}
 
 async function shareOrDownload(){
   const btn=document.getElementById('dl-btn');
   if(btn._sharing) return; // prevent concurrent calls (second tap while share sheet is open)
   btn._sharing=true;
 
-  // Always share/download MP4 only — WebM (Opus audio) plays silently on WhatsApp/Android.
-  // If mp4Blob is null (Cloudinary still processing or failed), fall through to WebM download.
+  // Only share MP4 — WebM (Opus audio) is silent on WhatsApp/Android.
+  // mp4Blob is null for WebM devices (no client-side transcode available) → download only.
   const blob=mp4Blob;
   if(!blob){
-    // MP4 not ready — download the raw WebM as fallback (no native share to avoid silent audio)
+    // No MP4 available (older device recording WebM) — download the raw file
     const webmBlob=finalBlob;
     if(!webmBlob){ btn._sharing=false; alert('No recording found.'); return; }
     const url=URL.createObjectURL(webmBlob);
@@ -1483,7 +1460,6 @@ async function shareOrDownload(){
         title:'My Raga Challenge',
         text:'I just completed a Carnatic Raga Challenge! #RagaChallenge #Carnatic'
       });
-      setTimeout(deleteFromCloudinary,3000);
       if(!fbShared){ fbShared=true; showFeedbackProminent(); }
       btn._sharing=false; return;
     }catch(e){
@@ -1498,7 +1474,6 @@ async function shareOrDownload(){
   const a=document.createElement('a'); a.href=url;
   a.download=filename; a.click();
   setTimeout(()=>URL.revokeObjectURL(url),2000);
-  setTimeout(deleteFromCloudinary,3000);
   if(!fbShared){ fbShared=true; showFeedbackProminent(); }
   btn._sharing=false;
 }
@@ -1630,7 +1605,7 @@ function restart(){
   if(mediaStream){ mediaStream.getTracks().forEach(t=>t.stop()); mediaStream=null; }
   document.getElementById('preview-video').srcObject=null;
   document.getElementById('video-bg').srcObject=null;
-  chunks=[]; finalBlob=null; mp4Url=null; mp4Blob=null;
+  chunks=[]; finalBlob=null; mp4Blob=null;
   isRecording=false; drawRunning=false; currentIdx=0;
   countdownActive=false; countdownText='';
   challengeElapsed=0; uploadFailed=false; nativeMp4=false;
@@ -1644,7 +1619,6 @@ function restart(){
   dlBtn.classList.remove('processing');
   dlBtn.innerHTML='<i class="ph-bold ph-circle-notch spin-icon"></i> Preparing…';
   dlBtn.disabled=true;
-  document.getElementById('dl-skip').style.display='none';
   showScreen('setup-screen');
 }
 

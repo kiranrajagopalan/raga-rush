@@ -513,7 +513,7 @@ function modeLabel(){ return {easy:'Easy',notSoEasy:'Not So Easy',surpriseMe:'Su
 // ── Feedback analytics endpoint (optional Google Sheets logger) ──
 // Setup: Extensions → Apps Script → paste doPost handler → Deploy as web app (Anyone) → paste URL here
 const SHEETS_ENDPOINT = 'https://script.google.com/macros/s/AKfycbx6S-nn5jBqF3ZaYACvM-Cq_7fn9WPv7Yhyikph3F_0QhZcp4Q6FHFK6DbGQ47FiGJ1/exec';
-const APP_BUILD = '20260327-b6'; // bump this on every push so Sheets confirms which build you're testing
+const APP_BUILD = '20260327-b7'; // bump this on every push so Sheets confirms which build you're testing
 
 let difficulty='easy', timePerRaga=8, ragaCount=10;
 let lastSurpriseThemeIdx=-1, activeTheme=null;
@@ -528,6 +528,7 @@ let finalBlob=null;
 let countdownActive=false, countdownText='';
 let challengeElapsed=0, mp4Blob=null, uploadFailed=false, nativeMp4=false;
 let processingGuard=null; // safety timer — rescues "Preparing…" if all else fails
+let processingStarted=false; // once-gate — prevents concurrent invocations of processVideoInBackground
 let captureHeartbeat=null; // setInterval handle — keeps H264 encoder fed on Android Chrome
 let endCardActive=false, endCardStart=0;
 let slotOffset=0, cachedGrads={}, lastDrawTime=0;
@@ -1392,6 +1393,8 @@ function remuxToMp4(fmp4Blob){
 }
 
 async function processVideoInBackground(){
+  if(processingStarted) return; // once-gate: prevents 5s fallback + 30s guard from double-invoking
+  processingStarted=true;
   if(chunks.length===0){
     uploadFailed=true;
     clearTimeout(processingGuard);
@@ -1400,14 +1403,16 @@ async function processVideoInBackground(){
     return;
   }
   uploadFailed=false;
-  finalBlob=new Blob(chunks,{type:mime});
+  // mime is function-scoped inside startRecording() — use nativeMp4 (implicit global) instead
+  finalBlob=new Blob(chunks,{type:nativeMp4?'video/mp4':'video/webm'});
   const isOnDone=()=>document.getElementById('done-screen').classList.contains('active');
 
   if(nativeMp4){
     // fMP4 → standard MP4 via mp4box.js remux (local, ~1-2s, no server)
     setConv(30,'Processing…');
+    const _timeout=new Promise((_,r)=>setTimeout(()=>r(new Error('remux timeout')),10000));
     try{
-      mp4Blob=await remuxToMp4(finalBlob);
+      mp4Blob=await Promise.race([remuxToMp4(finalBlob),_timeout]);
     }catch(e){
       mp4Blob=finalBlob; // fallback: raw fMP4 (playable in most apps except WhatsApp)
     }
@@ -1608,7 +1613,7 @@ function restart(){
   chunks=[]; finalBlob=null; mp4Blob=null;
   isRecording=false; drawRunning=false; currentIdx=0;
   countdownActive=false; countdownText='';
-  challengeElapsed=0; uploadFailed=false; nativeMp4=false;
+  challengeElapsed=0; uploadFailed=false; nativeMp4=false; processingStarted=false;
   endCardActive=false; endCardStart=0;
   fbReaction=null; fbShared=false;
   fbSheetClose();

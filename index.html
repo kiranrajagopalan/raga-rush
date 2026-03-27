@@ -513,7 +513,7 @@ function modeLabel(){ return {easy:'Easy',notSoEasy:'Not So Easy',surpriseMe:'Su
 // ── Feedback analytics endpoint (optional Google Sheets logger) ──
 // Setup: Extensions → Apps Script → paste doPost handler → Deploy as web app (Anyone) → paste URL here
 const SHEETS_ENDPOINT = 'https://script.google.com/macros/s/AKfycbx6S-nn5jBqF3ZaYACvM-Cq_7fn9WPv7Yhyikph3F_0QhZcp4Q6FHFK6DbGQ47FiGJ1/exec';
-const APP_BUILD = '20260327-b2'; // bump this on every push so Sheets confirms which build you're testing
+const APP_BUILD = '20260327-b3'; // bump this on every push so Sheets confirms which build you're testing
 
 let difficulty='easy', timePerRaga=8, ragaCount=10;
 let lastSurpriseThemeIdx=-1, activeTheme=null;
@@ -812,10 +812,11 @@ function startRecording(){
   const g5=recCtx.createRadialGradient(W/2,0,0,W/2,0,W*0.8);
   g5.addColorStop(0,'rgba(26,16,0,0.8)'); g5.addColorStop(1,'rgba(0,0,0,0)');
   cachedGrads={slotTop:g3,slotBot:g4,endBg:g5};
-  // captureStream(0) = frame-on-demand: frames are only committed when requestFrame() is called.
-  // Prevents frozen video when Android Chrome throttles rAF (screen dim, battery saver) —
-  // captureStream(30) would repeat the last frame; captureStream(0) waits for an explicit push.
-  const videoStream=recCanvas.captureStream(0);
+  // captureStream(30) — continuous 30fps feed required by Android Chrome's hardware H264 encoder.
+  // captureStream(0) with requestFrame() produced zero-size chunks on Android (encoder never
+  // initialised), causing "Recording unavailable". A brief frozen-frame on screen-dim is
+  // acceptable; a failed recording is not.
+  const videoStream=recCanvas.captureStream(30);
   captureTrack=videoStream.getVideoTracks()[0];
   // Only include audio tracks that are actively live — ended tracks (can happen on Android
   // if the mic was backgrounded between recordings) produce a silently muted stream.

@@ -513,7 +513,7 @@ function modeLabel(){ return {easy:'Easy',notSoEasy:'Not So Easy',surpriseMe:'Su
 // ── Feedback analytics endpoint (optional Google Sheets logger) ──
 // Setup: Extensions → Apps Script → paste doPost handler → Deploy as web app (Anyone) → paste URL here
 const SHEETS_ENDPOINT = 'https://script.google.com/macros/s/AKfycbx6S-nn5jBqF3ZaYACvM-Cq_7fn9WPv7Yhyikph3F_0QhZcp4Q6FHFK6DbGQ47FiGJ1/exec';
-const APP_BUILD = '20260328-b22'; // bump this on every push so Sheets confirms which build you're testing
+const APP_BUILD = '20260328-b23'; // bump this on every push so Sheets confirms which build you're testing
 const CLOUDINARY_CLOUD = 'dfstch1ag';
 const CLOUDINARY_PRESET = 'forRagaChallange';
 const CLOUDINARY_UPLOAD_URL = 'https://api.cloudinary.com/v1_1/dfstch1ag/video/upload';
@@ -529,7 +529,7 @@ let recCanvas=null, recCtx=null, drawRunning=false;
 let finalBlob=null;
 let _cdDeleteToken = null; // Cloudinary delete token for cleanup after share/download
 let countdownActive=false, countdownText='';
-let challengeElapsed=0, mp4Blob=null, uploadFailed=false, nativeMp4=false;
+let challengeElapsed=0, mp4Blob=null, mp4DirectUrl=null, uploadFailed=false, nativeMp4=false;
 let processingGuard=null; // safety timer — rescues "Preparing…" if all else fails
 let processingStarted=false; // once-gate — prevents concurrent invocations of processVideoInBackground
 let captureHeartbeat=null; // setInterval handle — keeps H264 encoder fed on Android Chrome
@@ -1343,16 +1343,17 @@ function enableDownloadButton(){
   const pb=document.getElementById('btn-progress');
   if(pb){ pb.style.width='100%'; }
   btn.classList.remove('processing');
-  const canShare=navigator.canShare&&navigator.canShare({files:[new File([],'x.mp4',{type:'video/mp4'})]});
-  btn.innerHTML=canShare?'<i class="ph-bold ph-share-network"></i> Share Video':'<i class="ph-bold ph-download-simple"></i> Download MP4';
+  const isMobile=/Mobi|Android|iPhone|iPad/i.test(navigator.userAgent);
+  const hasShare=!!navigator.share;
+  btn.innerHTML=(isMobile&&hasShare)?'<i class="ph-bold ph-share-network"></i> Share Video':'<i class="ph-bold ph-download-simple"></i> Download MP4';
   btn.disabled=false;
   // Show diagnostic info below button (temporary — remove after debugging)
   const d=window._rcDiag||{};
   const sizeMB=d.mp4BlobSize?((d.mp4BlobSize/1048576).toFixed(1)+'MB'):'?';
-  const rawMB=d.mp4BlobSizeRaw?((d.mp4BlobSizeRaw/1048576).toFixed(1)+'MB'):'?';
   const moov=d.moovPosition||'?';
+  const cs=navigator.canShare?navigator.canShare({files:[new File([new Uint8Array(1)],'t.mp4',{type:'video/mp4'})]}):'no';
   const diag=document.getElementById('rc-diag');
-  if(diag) diag.textContent=APP_BUILD+' | raw:'+rawMB+' final:'+sizeMB+' | moov:'+moov+' | '+((d.pipelineResult)||'?');
+  if(diag) diag.textContent=APP_BUILD+' | '+sizeMB+' | moov:'+moov+' | canShare:'+cs+' | '+((d.pipelineResult)||'?');
 }
 
 
@@ -1515,6 +1516,7 @@ async function processVideoInBackground(){
     // Phase 2: Fetch converted flat MP4 back
     setConv(80,'Converting\u2026');
     const mp4Url=uploadResult.secure_url.replace(/\/upload\//,'/upload/f_mp4,vc_h264,ac_aac,af_44100/').replace(/\.[^.]+$/,'.mp4');
+    mp4DirectUrl=mp4Url; // store for direct download fallback
     const fetchAbort=new AbortController();
     const fetchTimer=setTimeout(()=>fetchAbort.abort(),40000);
     const resp=await fetch(mp4Url,{signal:fetchAbort.signal});
@@ -1554,60 +1556,79 @@ function setConv(pct,msg){
 
 async function shareOrDownload(){
   const btn=document.getElementById('dl-btn');
-  if(btn._sharing) return; // prevent concurrent calls (second tap while share sheet is open)
+  if(btn._sharing) return;
   btn._sharing=true;
   try{
-    // Only share MP4 — WebM (Opus audio) is silent on WhatsApp/Android.
-    // mp4Blob is null for WebM devices (no client-side transcode available) → download only.
     const blob=mp4Blob;
     if(!blob){
-      // No MP4 available (upload failed or still processing) — download raw file
+      // No MP4 — download raw recording as fallback
       const rawBlob=finalBlob;
       if(!rawBlob){ alert('No recording found.'); return; }
-      const ext=nativeMp4?'mp4':'webm';
-      const url=URL.createObjectURL(rawBlob);
-      const a=document.createElement('a'); a.href=url;
-      a.download='raga-challenge-'+difficulty+'-'+Date.now()+'.'+ext; a.click();
-      setTimeout(()=>URL.revokeObjectURL(url),2000);
+      downloadBlob(rawBlob, 'raga-challenge-'+difficulty+'-'+Date.now()+'.'+(nativeMp4?'mp4':'webm'));
       if(!fbShared){ fbShared=true; showFeedbackProminent(); }
       return;
     }
     const filename='raga-challenge-'+difficulty+'-'+Date.now()+'.mp4';
-    // blob.slice(0) forces a fresh Blob copy — avoids iOS WebKit blob-reuse issue
-    // where the same Blob reference on a second share falls through to download
     const file=new File([blob.slice(0)], filename, {type:'video/mp4'});
 
-    // Try Web Share API (works on mobile Safari + Android Chrome)
+    // Try Web Share API — skip canShare guard, just try and catch
+    // (canShare returns false on some Chrome Android versions even though share works)
     let shared=false;
-    if(navigator.canShare && navigator.canShare({files:[file]})){
+    if(navigator.share){
       try{
-        // 15s timeout — navigator.share() can hang forever on some Android versions
-      // (promise never settles after WhatsApp opens), which would leave btn._sharing=true.
-      const _st=new Promise((_,r)=>setTimeout(()=>r(new Error('share-timeout')),15000));
-        await Promise.race([
-          navigator.share({files:[file]}),
-          _st
-        ]);
+        const _st=new Promise((_,r)=>setTimeout(()=>r(new Error('share-timeout')),15000));
+        await Promise.race([navigator.share({files:[file]}), _st]);
         shared=true;
       }catch(e){
-        if(e.name==='AbortError') return; // user explicitly dismissed share sheet — no download
-        // share-timeout or other error: fall through to download below so user gets the file
+        if(e.name==='AbortError') return;
+        // NotAllowedError, TypeError, share-timeout → fall through to download
+        window._rcDiag.shareError=e.name+':'+e.message;
       }
     }
 
     if(!shared){
-      // Fallback: plain download (MP4)
-      const url=URL.createObjectURL(blob);
-      const a=document.createElement('a'); a.href=url;
-      a.download=filename; a.click();
-      setTimeout(()=>URL.revokeObjectURL(url),2000);
+      // Fallback 1: blob download (append <a> to DOM for Chrome Android)
+      if(!downloadBlob(blob, filename) && mp4DirectUrl){
+        // Fallback 2: direct Cloudinary URL download (skip blob entirely)
+        downloadUrl(mp4DirectUrl, filename);
+      }
     }
 
     if(!fbShared){ fbShared=true; showFeedbackProminent(); }
   }finally{
     btn._sharing=false;
-    cleanupCloudinary(); // delete from Cloudinary after share/download
+    // Delay cleanup — keep Cloudinary file alive in case direct URL download needs it
+    setTimeout(cleanupCloudinary, 30000);
   }
+}
+
+// Robust blob download — returns true if click fired
+function downloadBlob(blob, filename){
+  try{
+    const url=URL.createObjectURL(blob);
+    const a=document.createElement('a');
+    a.style.display='none';
+    a.href=url;
+    a.download=filename;
+    document.body.appendChild(a);
+    a.click();
+    document.body.removeChild(a);
+    setTimeout(()=>URL.revokeObjectURL(url),10000);
+    return true;
+  }catch(e){ return false; }
+}
+
+// Direct URL download fallback (uses Cloudinary URL, no blob)
+function downloadUrl(url, filename){
+  const a=document.createElement('a');
+  a.style.display='none';
+  a.href=url;
+  a.download=filename;
+  a.target='_blank';
+  a.rel='noopener';
+  document.body.appendChild(a);
+  a.click();
+  document.body.removeChild(a);
 }
 
 // ── Feedback functions ──
@@ -1738,7 +1759,7 @@ function restart(){
   if(mediaStream){ mediaStream.getTracks().forEach(t=>t.stop()); mediaStream=null; }
   document.getElementById('preview-video').srcObject=null;
   document.getElementById('video-bg').srcObject=null;
-  chunks=[]; finalBlob=null; mp4Blob=null;
+  chunks=[]; finalBlob=null; mp4Blob=null; mp4DirectUrl=null;
   isRecording=false; drawRunning=false; currentIdx=0;
   countdownActive=false; countdownText='';
   challengeElapsed=0; uploadFailed=false; nativeMp4=false; processingStarted=false;

@@ -3,11 +3,10 @@
 > Current dev state + decisions. For stable architecture see `PROJECT.md`.
 
 ## Status: ALL FEATURES COMPLETE
-Build: `20260328-b35` | Branch: `main` | Video sharing ✅ iOS ✅ Android
+Build: `20260328-b36` | Branch: `main` | Video sharing ✅ iOS ✅ Android
 
 ## Pending Tasks
 1. **FormSubmit activation** — trigger one real feedback submission, click the activation email from FormSubmit.co
-2. **Optional:** Rename `raga-challenge.html` → `index.html` for cleaner URL
 
 ## Critical Decisions (do NOT undo these)
 
@@ -39,6 +38,26 @@ navigator.share({files:[file]})  // NO title, NO text
 ### Recording bitrate — 5 Mbps on all platforms
 - Was 2.5 Mbps on mobile. Increased to 5 Mbps to give Cloudinary a higher quality source.
 - File size is ~2-3 MB for 30s recording — acceptable.
+
+### captureStream — Safari vs Chrome split
+```js
+recCanvas.captureStream(isSafari ? 0 : 30);
+```
+- Safari (iOS + macOS): `captureStream(0)` — manual frame push via `requestFrame()`. Safari's `captureStream(30)` conflicts with explicit `requestFrame()` calls, freezing the video track.
+- Chrome: `captureStream(30)` — continuous 30fps feed required by H264 hardware encoder. `captureStream(0)` on Chrome Android produced zero-size chunks.
+- rAF watchdog in heartbeat calls `drawLoop` directly if rAF hasn't fired in >150ms.
+- Do NOT merge these paths. Each browser engine has its own broken path.
+
+### Share blob must be materialized
+```js
+const shareBuf = await blob.arrayBuffer();
+const file = new File([shareBuf], filename, {type:'video/mp4'});
+```
+- Safari's `fetch().blob()` can return lazily-backed Blobs — not fully resident in memory.
+- `navigator.share()` fails immediately (TypeError) when reading lazy blob data.
+- iOS pipeline materializes via `arrayBuffer()` after Cloudinary fetch.
+- `shareOrDownload()` also materializes defensively before creating the File (all platforms).
+- Do NOT use `blob.slice(0)` — it creates another lazy view, not a materialized copy.
 
 ### mp4box.js removed — custom parser instead
 - mp4box.js could not extract samples from Chrome Android's fMP4 (onSamples never fired).

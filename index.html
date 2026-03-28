@@ -513,7 +513,7 @@ function modeLabel(){ return {easy:'Easy',notSoEasy:'Not So Easy',surpriseMe:'Su
 // ── Feedback analytics endpoint (optional Google Sheets logger) ──
 // Setup: Extensions → Apps Script → paste doPost handler → Deploy as web app (Anyone) → paste URL here
 const SHEETS_ENDPOINT = 'https://script.google.com/macros/s/AKfycbx6S-nn5jBqF3ZaYACvM-Cq_7fn9WPv7Yhyikph3F_0QhZcp4Q6FHFK6DbGQ47FiGJ1/exec';
-const APP_BUILD = '20260328-b35'; // bump this on every push so Sheets confirms which build you're testing
+const APP_BUILD = '20260328-b36'; // bump this on every push so Sheets confirms which build you're testing
 const CLOUDINARY_CLOUD = 'dfstch1ag';
 const CLOUDINARY_PRESET = 'forRagaChallange';
 const CLOUDINARY_UPLOAD_URL = 'https://api.cloudinary.com/v1_1/dfstch1ag/video/upload';
@@ -816,11 +816,13 @@ function startRecording(){
   const g5=recCtx.createRadialGradient(W/2,0,0,W/2,0,W*0.8);
   g5.addColorStop(0,'rgba(26,16,0,0.8)'); g5.addColorStop(1,'rgba(0,0,0,0)');
   cachedGrads={slotTop:g3,slotBot:g4,endBg:g5};
-  // captureStream(30) — continuous 30fps feed required by Android Chrome's hardware H264 encoder.
-  // captureStream(0) with requestFrame() produced zero-size chunks on Android (encoder never
-  // initialised), causing "Recording unavailable". A brief frozen-frame on screen-dim is
-  // acceptable; a failed recording is not.
-  const videoStream=recCanvas.captureStream(30);
+  const isIOS=/iPad|iPhone|iPod/.test(navigator.userAgent)||(navigator.platform==='MacIntel'&&navigator.maxTouchPoints>1);
+  const isSafari=(/Safari/.test(navigator.userAgent)&&!/Chrome/.test(navigator.userAgent));
+  // Safari: captureStream(0) — manual frame push via requestFrame(). Safari's
+  // captureStream(30) conflicts with explicit requestFrame() calls, freezing video.
+  // Chrome: captureStream(30) — continuous feed required by H264 hardware encoder.
+  // captureStream(0) on Chrome Android produced zero-size chunks (encoder never init'd).
+  const videoStream=recCanvas.captureStream(isSafari?0:30);
   captureTrack=videoStream.getVideoTracks()[0];
   // Only include audio tracks that are actively live — ended tracks (can happen on Android
   // if the mic was backgrounded between recordings) produce a silently muted stream.
@@ -829,9 +831,6 @@ function startRecording(){
   const cs=audioTracks.length>0
     ? new MediaStream([...videoStream.getVideoTracks(),...audioTracks])
     : videoStream;
-  // iOS only supports MP4 recording; all others prefer WebM (Cloudinary handles WebM→MP4 perfectly).
-  // Chrome's MP4 recording produces fMP4 which Cloudinary truncates to ~2s.
-  const isIOS=/iPad|iPhone|iPod/.test(navigator.userAgent)||(navigator.platform==='MacIntel'&&navigator.maxTouchPoints>1);
   // iOS: prefer MP4 (only option). Others: prefer WebM (reliable VP9 video capture).
   // Chrome Android lies about MP4 support on some devices (produces audio-only fMP4).
   const mimes=isIOS
@@ -839,9 +838,7 @@ function startRecording(){
     : ['video/webm;codecs=vp9,opus','video/webm;codecs=vp8,opus','video/webm','video/mp4;codecs=avc1,mp4a.40.2','video/mp4'];
   const mime=mimes.find(m=>MediaRecorder.isTypeSupported(m))||'video/webm';
   nativeMp4=mime.startsWith('video/mp4');
-  // Halve bitrate on mobile — same quality at phone resolutions, significantly less encoder heat
-const isMobile=/Mobi|Android/i.test(navigator.userAgent);
-mediaRecorder=new MediaRecorder(cs,{mimeType:mime,videoBitsPerSecond:5000000,audioBitsPerSecond:128000});
+  mediaRecorder=new MediaRecorder(cs,{mimeType:mime,videoBitsPerSecond:5000000,audioBitsPerSecond:128000});
   mediaRecorder.ondataavailable=e=>{ if(e.data.size>0) chunks.push(e.data); };
   isRecording=true; drawRunning=true; lastDrawTime=0;
   slotSpinning=false; ragaRevealAt=0; ragaRevealName='';
@@ -850,14 +847,17 @@ mediaRecorder=new MediaRecorder(cs,{mimeType:mime,videoBitsPerSecond:5000000,aud
   sessionId='rc_'+Date.now().toString(36)+'_'+Math.random().toString(36).slice(2,6);
   mediaRecorder.start(100); startTime=Date.now();
   // Heartbeat: push canvas state at 30 fps via setInterval, independent of rAF.
-  // Android Chrome's H264 hardware encoder requires a steady frame stream to
-  // initialise its keyframe interval — without this, captureStream(0) + rAF-only
-  // requestFrame() calls can leave the encoder in a partial state where stop()
-  // never flushes and onstop never fires.  When rAF is running normally the
-  // heartbeat and drawLoop both call requestFrame(); the extra calls are no-ops
-  // (encoder captures one frame per interval regardless).
+  // 1) Calls requestFrame() — keeps Android Chrome's H264 encoder fed.
+  // 2) rAF watchdog — if rAF hasn't fired in >150ms (iOS low-power, backgrounding),
+  //    calls drawLoop directly so the canvas keeps getting painted and the video
+  //    track doesn't freeze.
   clearInterval(captureHeartbeat);
-  captureHeartbeat=setInterval(()=>captureTrack?.requestFrame?.(), DRAW_INTERVAL);
+  captureHeartbeat=setInterval(()=>{
+    captureTrack?.requestFrame?.();
+    if(drawRunning && performance.now()-lastDrawTime>150){
+      drawLoop(video,CW,CH,dpr);
+    }
+  }, DRAW_INTERVAL);
   // Pause/resume MediaRecorder on visibility change — prevents audio/video desync
   // when Android dims the screen (rAF pauses but audio track keeps running)
   const onVisChange=()=>{
@@ -1198,8 +1198,8 @@ function drawLoop(video,W,H,dpr=1){
     }
   }
 
-  // Explicit frame push — required because we use captureStream(0).
-  // Called after every completed paint so the canvas track only emits real frames.
+  // Explicit frame push — required on Safari where we use captureStream(0).
+  // On Chrome (captureStream(30)) these are harmless no-ops.
   captureTrack?.requestFrame?.();
   requestAnimationFrame(()=>drawLoop(video,W,H,dpr));
 }
@@ -1626,7 +1626,10 @@ async function processVideoInBackground(){
       const fetchTimer=setTimeout(()=>fetchAbort.abort(),40000);
       const resp=await fetch(mp4Url,{signal:fetchAbort.signal});
       if(!resp.ok) throw new Error('mp4 fetch HTTP '+resp.status);
-      mp4Blob=await resp.blob();
+      // Materialize fully — Safari fetch blobs can be lazy-backed, causing
+      // navigator.share() to fail when it tries to read the File data.
+      const _ab=await resp.arrayBuffer();
+      mp4Blob=new Blob([_ab],{type:'video/mp4'});
       clearTimeout(fetchTimer);
     } else {
       // ── Path B: Android/Desktop → Cloudinary + client-side remux ──
@@ -1682,7 +1685,10 @@ async function shareOrDownload(){
       return;
     }
     const filename='raga-challenge-'+difficulty+'-'+Date.now()+'.mp4';
-    const file=new File([blob.slice(0)], filename, {type:'video/mp4'});
+    // Ensure blob data is fully resident before creating File for share.
+    // Safari fetch blobs can be lazy-backed; materializing prevents share failure.
+    const shareBuf=await blob.arrayBuffer();
+    const file=new File([shareBuf], filename, {type:'video/mp4'});
 
     // Try Web Share API — skip canShare guard, just try and catch
     // (canShare returns false on some Chrome Android versions even though share works)
@@ -1694,7 +1700,7 @@ async function shareOrDownload(){
         shared=true;
       }catch(e){
         if(e.name==='AbortError') return;
-        // NotAllowedError, TypeError, share-timeout → fall through to download
+        console.warn('[share]',e.name,e.message,'size:',blob?.size);
       }
     }
 

@@ -460,6 +460,7 @@ html, body {
         </div>
       </div>
     </div>
+    <pre id="diag-panel" style="display:none;margin:8px 5%;padding:10px;background:#111;color:#0f0;font:11px/1.5 monospace;border-radius:8px;max-height:200px;overflow:auto;white-space:pre-wrap;word-break:break-all;text-align:left"></pre>
   </div>
 
   <!-- FEEDBACK BOTTOM SHEET -->
@@ -513,7 +514,11 @@ function modeLabel(){ return {easy:'Easy',notSoEasy:'Not So Easy',surpriseMe:'Su
 // ── Feedback analytics endpoint (optional Google Sheets logger) ──
 // Setup: Extensions → Apps Script → paste doPost handler → Deploy as web app (Anyone) → paste URL here
 const SHEETS_ENDPOINT = 'https://script.google.com/macros/s/AKfycbx6S-nn5jBqF3ZaYACvM-Cq_7fn9WPv7Yhyikph3F_0QhZcp4Q6FHFK6DbGQ47FiGJ1/exec';
-const APP_BUILD = '20260328-b36'; // bump this on every push so Sheets confirms which build you're testing
+const APP_BUILD = '20260328-b37'; // bump this on every push so Sheets confirms which build you're testing
+const _DIAG = location.search.includes('diag');
+const _diag = []; // diagnostic event log — shown on done screen with ?diag
+let _diagFrames = 0; // total frames painted by drawLoop
+let _diagShareResult = ''; // share/download outcome
 const CLOUDINARY_CLOUD = 'dfstch1ag';
 const CLOUDINARY_PRESET = 'forRagaChallange';
 const CLOUDINARY_UPLOAD_URL = 'https://api.cloudinary.com/v1_1/dfstch1ag/video/upload';
@@ -822,8 +827,13 @@ function startRecording(){
   // captureStream(30) conflicts with explicit requestFrame() calls, freezing video.
   // Chrome: captureStream(30) — continuous feed required by H264 hardware encoder.
   // captureStream(0) on Chrome Android produced zero-size chunks (encoder never init'd).
-  const videoStream=recCanvas.captureStream(isSafari?0:30);
+  const csFps=isSafari?0:30;
+  const videoStream=recCanvas.captureStream(csFps);
   captureTrack=videoStream.getVideoTracks()[0];
+  _diagFrames=0;
+  _diag.length=0;
+  _diag.push('cs:'+csFps+' safari:'+isSafari+' iOS:'+isIOS);
+  _diag.push('rF:'+(typeof captureTrack?.requestFrame)+' track:'+captureTrack?.readyState);
   // Only include audio tracks that are actively live — ended tracks (can happen on Android
   // if the mic was backgrounded between recordings) produce a silently muted stream.
   const audioTracks=mediaStream.getAudioTracks().filter(t=>t.readyState==='live');
@@ -883,6 +893,7 @@ function drawLoop(video,W,H,dpr=1){
     return;
   }
   lastDrawTime=now;
+  _diagFrames++;
   const ctx=recCtx;
 
   // ── Section layout constants (15% top / 55% camera / 30% bottom) ──
@@ -1206,6 +1217,7 @@ function drawLoop(video,W,H,dpr=1){
 
 function stopRecording(onStopped){
   if(!isRecording){ onStopped&&onStopped(); return; }
+  _diag.push('stop: frames='+_diagFrames+' chunks='+chunks.length+' mrState='+mediaRecorder?.state);
   drawRunning=false; isRecording=false;
   document.getElementById('rec-badge').classList.remove('visible');
   clearInterval(captureHeartbeat); captureHeartbeat=null;
@@ -1335,6 +1347,9 @@ function logSession(){
       timezone:Intl.DateTimeFormat().resolvedOptions().timeZone,
       connection:navigator.connection?.effectiveType||'',
       build:APP_BUILD,
+      diag:_diag.join(' | '),
+      diag_frames:_diagFrames,
+      diag_share:_diagShareResult,
     })
   }); }catch(e){}
 }
@@ -1349,6 +1364,11 @@ function enableDownloadButton(){
   const hasShare=!!navigator.share;
   btn.innerHTML=(isMobile&&hasShare)?'<i class="ph-bold ph-share-network"></i> Share Video':'<i class="ph-bold ph-download-simple"></i> Download MP4';
   btn.disabled=false;
+  // Show diag panel if ?diag is in URL
+  if(_DIAG){
+    const dp=document.getElementById('diag-panel');
+    if(dp){ dp.style.display='block'; dp.textContent=_diag.join('\n'); }
+  }
 }
 
 
@@ -1602,11 +1622,13 @@ async function processVideoInBackground(){
   }
   uploadFailed=false;
   finalBlob=new Blob(chunks,{type:nativeMp4?'video/mp4':'video/webm'});
+  _diag.push('raw: '+Math.round(finalBlob.size/1024)+'KB chunks='+chunks.length+' mp4='+nativeMp4);
   // Detect actual format from first bytes (Chrome may lie about MP4 support)
   const hdr=new Uint8Array(await finalBlob.slice(0,12).arrayBuffer());
   const hdrHex=Array.from(hdr).map(b=>b.toString(16).padStart(2,'0')).join(' ');
   const actuallyMp4=hdrHex.includes('66 74 79 70'); // 'ftyp' marker
   const actuallyWebm=(hdr[0]===0x1a&&hdr[1]===0x45&&hdr[2]===0xdf&&hdr[3]===0xa3);
+  _diag.push('hdr: '+hdrHex.slice(0,35)+' mp4='+actuallyMp4+' webm='+actuallyWebm);
   const isOnDone=()=>document.getElementById('done-screen').classList.contains('active');
 
   // iOS detection — iOS uses Cloudinary (WhatsApp iOS re-encodes anyway; client-remux has CTS issues on iOS)
@@ -1615,25 +1637,28 @@ async function processVideoInBackground(){
   try{
     if(_isIOS){
       // ── Path A: iOS → Cloudinary only ──
-      // WhatsApp iOS re-encodes all videos. Cloudinary fMP4 output is fine.
+      _diag.push('path:iOS');
       setConv(5,'Uploading\u2026');
       const uploadResult=await uploadToCloudinary(finalBlob);
       if(uploadResult.delete_token) _cdDeleteToken=uploadResult.delete_token;
+      _diag.push('upload:ok bytes='+uploadResult.bytes+' fmt='+uploadResult.format);
       setConv(80,'Converting\u2026');
       const mp4Url=uploadResult.secure_url.replace(/\/upload\//,'/upload/f_mp4,vc_h264:baseline:3.1,ac_aac,af_44100,br_4m/').replace(/\.[^.]+$/,'.mp4');
       mp4DirectUrl=mp4Url;
       const fetchAbort=new AbortController();
       const fetchTimer=setTimeout(()=>fetchAbort.abort(),40000);
       const resp=await fetch(mp4Url,{signal:fetchAbort.signal});
+      _diag.push('fetch: HTTP'+resp.status+' type='+resp.headers.get('content-type')+' len='+resp.headers.get('content-length'));
       if(!resp.ok) throw new Error('mp4 fetch HTTP '+resp.status);
       // Materialize fully — Safari fetch blobs can be lazy-backed, causing
       // navigator.share() to fail when it tries to read the File data.
       const _ab=await resp.arrayBuffer();
       mp4Blob=new Blob([_ab],{type:'video/mp4'});
+      _diag.push('mp4Blob: '+Math.round(mp4Blob.size/1024)+'KB (ab:'+_ab.byteLength+')');
       clearTimeout(fetchTimer);
     } else {
       // ── Path B: Android/Desktop → Cloudinary + client-side remux ──
-      // Step 1: Upload WebM to Cloudinary (server-side VP9→H264 transcode)
+      _diag.push('path:Android');
       setConv(5,'Uploading\u2026');
       const uploadResult=await uploadToCloudinary(finalBlob);
       if(uploadResult.delete_token) _cdDeleteToken=uploadResult.delete_token;
@@ -1654,6 +1679,7 @@ async function processVideoInBackground(){
       mp4Blob=await Promise.race([remuxToFlatMp4(fmp4Blob),_timeout]);
     }
   }catch(e){
+    _diag.push('ERR: '+e.message);
     mp4Blob=null;
     uploadFailed=true;
   }
@@ -1676,8 +1702,11 @@ async function shareOrDownload(){
   btn._sharing=true;
   try{
     const blob=mp4Blob;
+    _diag.push('share: blob='+(blob?Math.round(blob.size/1024)+'KB':'NULL')+' navShare='+!!navigator.share);
     if(!blob){
       // No MP4 — download raw recording as fallback
+      _diag.push('share: no blob, raw download');
+      _diagShareResult='dl-raw';
       const rawBlob=finalBlob;
       if(!rawBlob){ alert('No recording found.'); return; }
       downloadBlob(rawBlob, 'raga-challenge-'+difficulty+'-'+Date.now()+'.'+(nativeMp4?'mp4':'webm'));
@@ -1689,6 +1718,7 @@ async function shareOrDownload(){
     // Safari fetch blobs can be lazy-backed; materializing prevents share failure.
     const shareBuf=await blob.arrayBuffer();
     const file=new File([shareBuf], filename, {type:'video/mp4'});
+    _diag.push('file: '+Math.round(file.size/1024)+'KB name='+filename);
 
     // Try Web Share API — skip canShare guard, just try and catch
     // (canShare returns false on some Chrome Android versions even though share works)
@@ -1698,23 +1728,38 @@ async function shareOrDownload(){
         const _st=new Promise((_,r)=>setTimeout(()=>r(new Error('share-timeout')),15000));
         await Promise.race([navigator.share({files:[file]}), _st]);
         shared=true;
+        _diag.push('share: OK');
+        _diagShareResult='shared';
       }catch(e){
-        if(e.name==='AbortError') return;
+        if(e.name==='AbortError'){ _diag.push('share: user-cancel'); _diagShareResult='abort'; return; }
+        _diag.push('share: FAIL '+e.name+': '+e.message);
+        _diagShareResult='fail:'+e.name;
         console.warn('[share]',e.name,e.message,'size:',blob?.size);
       }
     }
 
     if(!shared){
       // Fallback 1: blob download (append <a> to DOM for Chrome Android)
-      if(!downloadBlob(blob, filename) && mp4DirectUrl){
+      const dlOk=downloadBlob(blob, filename);
+      _diag.push('dl-blob: '+(dlOk?'ok':'fail'));
+      if(!dlOk && mp4DirectUrl){
         // Fallback 2: direct Cloudinary URL download (skip blob entirely)
+        _diag.push('dl-url: '+mp4DirectUrl.slice(0,60));
         downloadUrl(mp4DirectUrl, filename);
+        _diagShareResult=_diagShareResult||'dl-url';
+      } else {
+        _diagShareResult=_diagShareResult||'dl-blob';
       }
     }
 
     if(!fbShared){ fbShared=true; showFeedbackProminent(); }
   }finally{
     btn._sharing=false;
+    // Refresh diag panel with share result
+    if(_DIAG){
+      const dp=document.getElementById('diag-panel');
+      if(dp){ dp.style.display='block'; dp.textContent=_diag.join('\n'); }
+    }
     // Delay cleanup — keep Cloudinary file alive in case direct URL download needs it
     setTimeout(cleanupCloudinary, 30000);
   }

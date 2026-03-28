@@ -513,7 +513,7 @@ function modeLabel(){ return {easy:'Easy',notSoEasy:'Not So Easy',surpriseMe:'Su
 // ── Feedback analytics endpoint (optional Google Sheets logger) ──
 // Setup: Extensions → Apps Script → paste doPost handler → Deploy as web app (Anyone) → paste URL here
 const SHEETS_ENDPOINT = 'https://script.google.com/macros/s/AKfycbx6S-nn5jBqF3ZaYACvM-Cq_7fn9WPv7Yhyikph3F_0QhZcp4Q6FHFK6DbGQ47FiGJ1/exec';
-const APP_BUILD = '20260328-b41'; // bump this on every push so Sheets confirms which build you're testing
+const APP_BUILD = '20260328-b42'; // bump this on every push so Sheets confirms which build you're testing
 const CLOUDINARY_CLOUD = 'dfstch1ag';
 const CLOUDINARY_PRESET = 'forRagaChallange';
 const CLOUDINARY_UPLOAD_URL = 'https://api.cloudinary.com/v1_1/dfstch1ag/video/upload';
@@ -538,6 +538,7 @@ let slotOffset=0, cachedGrads={}, lastDrawTime=0;
 let slotSpinning=false, ragaRevealAt=0, ragaRevealName='';
 let fbReaction=null, fbShared=false;
 let captureTrack=null; // CanvasCaptureMediaStreamTrack for frame-on-demand (Bug 1 fix)
+let cleanupTimer=null; // setTimeout handle for delayed Cloudinary cleanup — must be cancellable
 const DRAW_INTERVAL=1000/30; // target 30fps draw rate
 const DONE_TITLES=[
   'Todi\u2011ally crushed it!',
@@ -1724,8 +1725,10 @@ async function shareOrDownload(){
     if(!fbShared){ fbShared=true; showFeedbackProminent(); }
   }finally{
     btn._sharing=false;
-    // Delay cleanup — keep Cloudinary file alive in case direct URL download needs it
-    setTimeout(cleanupCloudinary, 30000);
+    // Delay cleanup — keep Cloudinary file alive in case direct URL download needs it.
+    // Must be cancellable so restart() doesn't let an orphaned timer delete the NEXT play's upload.
+    clearTimeout(cleanupTimer);
+    cleanupTimer=setTimeout(cleanupCloudinary, 30000);
   }
 }
 
@@ -1880,9 +1883,11 @@ async function inviteFriend(){
 }
 
 function restart(){
+  clearTimeout(cleanupTimer); cleanupTimer=null; // cancel orphaned cleanup timer from previous play
   cleanupCloudinary(); _cdDeleteToken=null;
   clearTimeout(processingGuard);
   clearInterval(captureHeartbeat); captureHeartbeat=null;
+  captureTrack=null; mediaRecorder=null; // release orphaned objects from previous play
   if(mediaStream){ mediaStream.getTracks().forEach(t=>t.stop()); mediaStream=null; }
   document.getElementById('preview-video').srcObject=null;
   document.getElementById('video-bg').srcObject=null;

@@ -3,7 +3,7 @@
 > Current dev state + decisions. For stable architecture see `PROJECT.md`.
 
 ## Status: ALL FEATURES COMPLETE
-Build: `20260328-b39` | Branch: `main` | Video sharing ✅ iOS ✅ Android
+Build: `20260328-b40` | Branch: `main` | Video sharing ✅ iOS ✅ Android
 
 ## Pending Tasks
 1. **FormSubmit activation** — trigger one real feedback submission, click the activation email from FormSubmit.co
@@ -48,16 +48,17 @@ recCanvas.captureStream(isSafari ? 0 : 30);
 - rAF watchdog in heartbeat calls `drawLoop` directly if rAF hasn't fired in >150ms.
 - Do NOT merge these paths. Each browser engine has its own broken path.
 
-### Share blob must be materialized
+### No await between click and navigator.share()
 ```js
-const shareBuf = await blob.arrayBuffer();
-const file = new File([shareBuf], filename, {type:'video/mp4'});
+const file = new File([blob], filename, {type:'video/mp4'}); // synchronous!
+await navigator.share({files:[file]});                        // first await = share
 ```
-- Safari's `fetch().blob()` can return lazily-backed Blobs — not fully resident in memory.
-- `navigator.share()` fails immediately (TypeError) when reading lazy blob data.
-- iOS pipeline materializes via `arrayBuffer()` after Cloudinary fetch.
-- `shareOrDownload()` also materializes defensively before creating the File (all platforms).
-- Do NOT use `blob.slice(0)` — it creates another lazy view, not a materialized copy.
+- Any `await` between the button click and `navigator.share()` consumes Chrome's transient user activation (5s timeout). `navigator.share()` then throws `NotAllowedError`.
+- Both pipelines already materialize their blobs before `shareOrDownload()` runs:
+  - Safari: `arrayBuffer()` in `processVideoInBackground`
+  - Android: `remuxToFlatMp4()` produces in-memory blob
+- Do NOT add `await blob.arrayBuffer()` or any other async call before `navigator.share()`.
+- Do NOT use `blob.slice(0)` — it creates a lazy view, not a materialized copy.
 
 ### mp4box.js removed — custom parser instead
 - mp4box.js could not extract samples from Chrome Android's fMP4 (onSamples never fired).

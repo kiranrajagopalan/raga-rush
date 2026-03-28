@@ -513,7 +513,7 @@ function modeLabel(){ return {easy:'Easy',notSoEasy:'Not So Easy',surpriseMe:'Su
 // ── Feedback analytics endpoint (optional Google Sheets logger) ──
 // Setup: Extensions → Apps Script → paste doPost handler → Deploy as web app (Anyone) → paste URL here
 const SHEETS_ENDPOINT = 'https://script.google.com/macros/s/AKfycbx6S-nn5jBqF3ZaYACvM-Cq_7fn9WPv7Yhyikph3F_0QhZcp4Q6FHFK6DbGQ47FiGJ1/exec';
-const APP_BUILD = '20260328-b39'; // bump this on every push so Sheets confirms which build you're testing
+const APP_BUILD = '20260328-b40'; // bump this on every push so Sheets confirms which build you're testing
 const CLOUDINARY_CLOUD = 'dfstch1ag';
 const CLOUDINARY_PRESET = 'forRagaChallange';
 const CLOUDINARY_UPLOAD_URL = 'https://api.cloudinary.com/v1_1/dfstch1ag/video/upload';
@@ -1686,10 +1686,12 @@ async function shareOrDownload(){
       return;
     }
     const filename='raga-challenge-'+difficulty+'-'+Date.now()+'.mp4';
-    // Ensure blob data is fully resident before creating File for share.
-    // Safari fetch blobs can be lazy-backed; materializing prevents share failure.
-    const shareBuf=await blob.arrayBuffer();
-    const file=new File([shareBuf], filename, {type:'video/mp4'});
+    // Create File synchronously from blob — no await before navigator.share().
+    // Any await between click and share() consumes Chrome's transient user activation,
+    // causing NotAllowedError. Both pipelines already materialize their blobs:
+    // iOS/Safari: arrayBuffer() in processVideoInBackground
+    // Android: remuxToFlatMp4() produces in-memory blob
+    const file=new File([blob], filename, {type:'video/mp4'});
 
     // Try Web Share API on mobile only — desktop Chrome has navigator.share but
     // opens a share dialog; dismissing it (AbortError) exits without downloading.

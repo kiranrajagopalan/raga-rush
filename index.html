@@ -513,7 +513,7 @@ function modeLabel(){ return {easy:'Easy',notSoEasy:'Not So Easy',surpriseMe:'Su
 // ── Feedback analytics endpoint (optional Google Sheets logger) ──
 // Setup: Extensions → Apps Script → paste doPost handler → Deploy as web app (Anyone) → paste URL here
 const SHEETS_ENDPOINT = 'https://script.google.com/macros/s/AKfycbx6S-nn5jBqF3ZaYACvM-Cq_7fn9WPv7Yhyikph3F_0QhZcp4Q6FHFK6DbGQ47FiGJ1/exec';
-const APP_BUILD = '20260328-b42'; // bump this on every push so Sheets confirms which build you're testing
+const APP_BUILD = '20260328-b43'; // bump this on every push so Sheets confirms which build you're testing
 const CLOUDINARY_CLOUD = 'dfstch1ag';
 const CLOUDINARY_PRESET = 'forRagaChallange';
 const CLOUDINARY_UPLOAD_URL = 'https://api.cloudinary.com/v1_1/dfstch1ag/video/upload';
@@ -1622,6 +1622,11 @@ async function processVideoInBackground(){
   const _isSafari=(/Safari/.test(navigator.userAgent)&&!/Chrome/.test(navigator.userAgent));
 
   try{
+    // Dynamic fetch timeout: Cloudinary's first-request transcode is proportional to
+    // recording duration. VP9→H264 (Android) is slower than H264→H264 (Safari).
+    // Use 1.5× recording time with generous floor of 120s.
+    const fetchTimeout=Math.max(120000, Math.round(challengeElapsed*1500));
+
     if(_isSafari){
       // ── Path A: Safari (iOS + macOS) → Cloudinary only ──
       setConv(5,'Uploading\u2026');
@@ -1631,7 +1636,7 @@ async function processVideoInBackground(){
       const mp4Url=uploadResult.secure_url.replace(/\/upload\//,'/upload/f_mp4,vc_h264:baseline:3.1,ac_aac,af_44100,br_4m/').replace(/\.[^.]+$/,'.mp4');
       mp4DirectUrl=mp4Url;
       const fetchAbort=new AbortController();
-      const fetchTimer=setTimeout(()=>fetchAbort.abort(),120000); // 120s: covers transcode + download for long videos
+      const fetchTimer=setTimeout(()=>fetchAbort.abort(),fetchTimeout);
       const resp=await fetch(mp4Url,{signal:fetchAbort.signal});
       if(!resp.ok) throw new Error('mp4 fetch HTTP '+resp.status);
       // Materialize fully — Safari fetch blobs can be lazy-backed, causing
@@ -1650,17 +1655,27 @@ async function processVideoInBackground(){
       const mp4Url=uploadResult.secure_url.replace(/\/upload\//,'/upload/f_mp4,vc_h264:baseline:3.1,ac_aac,af_44100,br_4m/').replace(/\.[^.]+$/,'.mp4');
       mp4DirectUrl=mp4Url;
       const fetchAbort=new AbortController();
-      const fetchTimer=setTimeout(()=>fetchAbort.abort(),120000); // 120s: covers transcode + download for long videos
+      const fetchTimer=setTimeout(()=>fetchAbort.abort(),fetchTimeout);
       const resp=await fetch(mp4Url,{signal:fetchAbort.signal});
       if(!resp.ok) throw new Error('mp4 fetch HTTP '+resp.status);
       const fmp4Blob=await resp.blob();
       clearTimeout(fetchTimer);
       // Step 3: Client-side remux fMP4 → flat MP4 (WhatsApp Android needs flat MP4)
+      // If remux fails (timeout, memory, parsing), fall back to Cloudinary's fMP4.
+      // fMP4 may not work on older WhatsApp but works on Telegram, email, most apps.
       setConv(85,'Optimising\u2026');
-      const _timeout=new Promise((_,r)=>setTimeout(()=>r(new Error('remux timeout')),30000)); // 30s for longer videos
-      mp4Blob=await Promise.race([remuxToFlatMp4(fmp4Blob),_timeout]);
+      const remuxTimeout=Math.max(30000, Math.round(fmp4Blob.size/300000)*1000); // ~3s per MB, min 30s
+      try{
+        const _timeout=new Promise((_,r)=>setTimeout(()=>r(new Error('remux timeout')),remuxTimeout));
+        mp4Blob=await Promise.race([remuxToFlatMp4(fmp4Blob),_timeout]);
+      }catch(remuxErr){
+        console.warn('[remux] fallback to fMP4:',remuxErr.message,'size:',fmp4Blob.size);
+        mp4Blob=fmp4Blob; // fMP4 fallback — better than raw WebM
+      }
     }
   }catch(e){
+    // Upload or fetch failed — no usable video from Cloudinary
+    console.warn('[pipeline]',e.message);
     mp4Blob=null;
     uploadFailed=true;
   }

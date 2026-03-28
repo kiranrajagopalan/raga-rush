@@ -513,7 +513,7 @@ function modeLabel(){ return {easy:'Easy',notSoEasy:'Not So Easy',surpriseMe:'Su
 // ── Feedback analytics endpoint (optional Google Sheets logger) ──
 // Setup: Extensions → Apps Script → paste doPost handler → Deploy as web app (Anyone) → paste URL here
 const SHEETS_ENDPOINT = 'https://script.google.com/macros/s/AKfycbx6S-nn5jBqF3ZaYACvM-Cq_7fn9WPv7Yhyikph3F_0QhZcp4Q6FHFK6DbGQ47FiGJ1/exec';
-const APP_BUILD = '20260328-b40'; // bump this on every push so Sheets confirms which build you're testing
+const APP_BUILD = '20260328-b41'; // bump this on every push so Sheets confirms which build you're testing
 const CLOUDINARY_CLOUD = 'dfstch1ag';
 const CLOUDINARY_PRESET = 'forRagaChallange';
 const CLOUDINARY_UPLOAD_URL = 'https://api.cloudinary.com/v1_1/dfstch1ag/video/upload';
@@ -1347,9 +1347,14 @@ function enableDownloadButton(){
   const pb=document.getElementById('btn-progress');
   if(pb){ pb.style.width='100%'; }
   btn.classList.remove('processing');
-  const isMobile=/Mobi|Android|iPhone|iPad/i.test(navigator.userAgent);
-  const hasShare=!!navigator.share;
-  btn.innerHTML=(isMobile&&hasShare)?'<i class="ph-bold ph-share-network"></i> Share Video':'<i class="ph-bold ph-download-simple"></i> Download MP4';
+  if(uploadFailed){
+    // Processing failed — offer raw recording download (no share, format may not be MP4)
+    btn.innerHTML='<i class="ph-bold ph-download-simple"></i> Download Recording';
+  } else {
+    const isMobile=/Mobi|Android|iPhone|iPad/i.test(navigator.userAgent);
+    const hasShare=!!navigator.share;
+    btn.innerHTML=(isMobile&&hasShare)?'<i class="ph-bold ph-share-network"></i> Share Video':'<i class="ph-bold ph-download-simple"></i> Download MP4';
+  }
   btn.disabled=false;
 }
 
@@ -1625,7 +1630,7 @@ async function processVideoInBackground(){
       const mp4Url=uploadResult.secure_url.replace(/\/upload\//,'/upload/f_mp4,vc_h264:baseline:3.1,ac_aac,af_44100,br_4m/').replace(/\.[^.]+$/,'.mp4');
       mp4DirectUrl=mp4Url;
       const fetchAbort=new AbortController();
-      const fetchTimer=setTimeout(()=>fetchAbort.abort(),40000);
+      const fetchTimer=setTimeout(()=>fetchAbort.abort(),120000); // 120s: covers transcode + download for long videos
       const resp=await fetch(mp4Url,{signal:fetchAbort.signal});
       if(!resp.ok) throw new Error('mp4 fetch HTTP '+resp.status);
       // Materialize fully — Safari fetch blobs can be lazy-backed, causing
@@ -1644,14 +1649,14 @@ async function processVideoInBackground(){
       const mp4Url=uploadResult.secure_url.replace(/\/upload\//,'/upload/f_mp4,vc_h264:baseline:3.1,ac_aac,af_44100,br_4m/').replace(/\.[^.]+$/,'.mp4');
       mp4DirectUrl=mp4Url;
       const fetchAbort=new AbortController();
-      const fetchTimer=setTimeout(()=>fetchAbort.abort(),40000);
+      const fetchTimer=setTimeout(()=>fetchAbort.abort(),120000); // 120s: covers transcode + download for long videos
       const resp=await fetch(mp4Url,{signal:fetchAbort.signal});
       if(!resp.ok) throw new Error('mp4 fetch HTTP '+resp.status);
       const fmp4Blob=await resp.blob();
       clearTimeout(fetchTimer);
       // Step 3: Client-side remux fMP4 → flat MP4 (WhatsApp Android needs flat MP4)
       setConv(85,'Optimising\u2026');
-      const _timeout=new Promise((_,r)=>setTimeout(()=>r(new Error('remux timeout')),15000));
+      const _timeout=new Promise((_,r)=>setTimeout(()=>r(new Error('remux timeout')),30000)); // 30s for longer videos
       mp4Blob=await Promise.race([remuxToFlatMp4(fmp4Blob),_timeout]);
     }
   }catch(e){

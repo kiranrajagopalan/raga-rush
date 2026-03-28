@@ -3,7 +3,7 @@
 > Current dev state + decisions. For stable architecture see `PROJECT.md`.
 
 ## Status: ALL FEATURES COMPLETE
-Build: `20260328-b40` | Branch: `main` | Video sharing ✅ iOS ✅ Android
+Build: `20260328-b41` | Branch: `main` | Video sharing ✅ iOS ✅ Android
 
 ## Pending Tasks
 1. **FormSubmit activation** — trigger one real feedback submission, click the activation email from FormSubmit.co

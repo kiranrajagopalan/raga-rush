@@ -513,7 +513,7 @@ function modeLabel(){ return {easy:'Easy',notSoEasy:'Not So Easy',surpriseMe:'Su
 // ── Feedback analytics endpoint (optional Google Sheets logger) ──
 // Setup: Extensions → Apps Script → paste doPost handler → Deploy as web app (Anyone) → paste URL here
 const SHEETS_ENDPOINT = 'https://script.google.com/macros/s/AKfycbx6S-nn5jBqF3ZaYACvM-Cq_7fn9WPv7Yhyikph3F_0QhZcp4Q6FHFK6DbGQ47FiGJ1/exec';
-const APP_BUILD = '20260328-b38'; // bump this on every push so Sheets confirms which build you're testing
+const APP_BUILD = '20260328-b39'; // bump this on every push so Sheets confirms which build you're testing
 const CLOUDINARY_CLOUD = 'dfstch1ag';
 const CLOUDINARY_PRESET = 'forRagaChallange';
 const CLOUDINARY_UPLOAD_URL = 'https://api.cloudinary.com/v1_1/dfstch1ag/video/upload';
@@ -832,9 +832,10 @@ function startRecording(){
   const cs=audioTracks.length>0
     ? new MediaStream([...videoStream.getVideoTracks(),...audioTracks])
     : videoStream;
-  // iOS: prefer MP4 (only option). Others: prefer WebM (reliable VP9 video capture).
+  // Safari (iOS + macOS): prefer MP4 recording. Others: prefer WebM (reliable VP9 capture).
   // Chrome Android lies about MP4 support on some devices (produces audio-only fMP4).
-  const mimes=isIOS
+  // Safari macOS 16+ supports WebM but recording as MP4 avoids the remux pipeline.
+  const mimes=isSafari
     ? ['video/mp4;codecs=avc1,mp4a.40.2','video/mp4']
     : ['video/webm;codecs=vp9,opus','video/webm;codecs=vp8,opus','video/webm','video/mp4;codecs=avc1,mp4a.40.2','video/mp4'];
   const mime=mimes.find(m=>MediaRecorder.isTypeSupported(m))||'video/webm';
@@ -1610,12 +1611,13 @@ async function processVideoInBackground(){
   const actuallyWebm=(hdr[0]===0x1a&&hdr[1]===0x45&&hdr[2]===0xdf&&hdr[3]===0xa3);
   const isOnDone=()=>document.getElementById('done-screen').classList.contains('active');
 
-  // iOS detection — iOS uses Cloudinary (WhatsApp iOS re-encodes anyway; client-remux has CTS issues on iOS)
-  const _isIOS=/iPad|iPhone|iPod/.test(navigator.userAgent)||(navigator.platform==='MacIntel'&&navigator.maxTouchPoints>1);
+  // Safari detection — all Safari uses Cloudinary only (no remux needed).
+  // Safari macOS doesn't need flat MP4; Chrome Android does (WhatsApp Android rejects fMP4).
+  const _isSafari=(/Safari/.test(navigator.userAgent)&&!/Chrome/.test(navigator.userAgent));
 
   try{
-    if(_isIOS){
-      // ── Path A: iOS → Cloudinary only ──
+    if(_isSafari){
+      // ── Path A: Safari (iOS + macOS) → Cloudinary only ──
       setConv(5,'Uploading\u2026');
       const uploadResult=await uploadToCloudinary(finalBlob);
       if(uploadResult.delete_token) _cdDeleteToken=uploadResult.delete_token;
@@ -1689,10 +1691,12 @@ async function shareOrDownload(){
     const shareBuf=await blob.arrayBuffer();
     const file=new File([shareBuf], filename, {type:'video/mp4'});
 
-    // Try Web Share API — skip canShare guard, just try and catch
-    // (canShare returns false on some Chrome Android versions even though share works)
+    // Try Web Share API on mobile only — desktop Chrome has navigator.share but
+    // opens a share dialog; dismissing it (AbortError) exits without downloading.
+    // Skip canShare guard (returns false on some Chrome Android versions even though share works).
+    const isMobile=/Mobi|Android|iPhone|iPad/i.test(navigator.userAgent);
     let shared=false;
-    if(navigator.share){
+    if(navigator.share && isMobile){
       try{
         await navigator.share({files:[file]});
         shared=true;
@@ -1703,8 +1707,7 @@ async function shareOrDownload(){
     }
 
     if(!shared){
-      // Fallback 1: blob download (append <a> to DOM for Chrome Android)
-      // Fallback 1: blob download (append <a> to DOM for Chrome Android)
+      // Fallback: blob download (append <a> to DOM)
       if(!downloadBlob(blob, filename) && mp4DirectUrl){
         // Fallback 2: direct Cloudinary URL download (skip blob entirely)
         downloadUrl(mp4DirectUrl, filename);

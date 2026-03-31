@@ -3,17 +3,18 @@
 > Current dev state + decisions. For stable architecture see `PROJECT.md`.
 
 ## Status: ALL FEATURES COMPLETE
-Build: `20260328-b43` | Branch: `main` | Video sharing ✅ iOS ✅ Android
+Build: `20260328-b44` | Branch: `security-fixes` | Video sharing ✅ iOS ✅ Android ✅ Desktop
 
 ## Pending Tasks
-1. **FormSubmit activation** — trigger one real feedback submission, click the activation email from FormSubmit.co
+_(none)_
 
 ## Critical Decisions (do NOT undo these)
 
 ### Video pipeline — dual path is intentional
-- iOS → Cloudinary only (no client remux). WhatsApp iOS re-encodes all videos anyway.
-- Android → Cloudinary + client remux to flat MP4. WhatsApp Android rejects fMP4.
+- **Safari (iOS + macOS)** → Cloudinary only (no client remux). WhatsApp iOS re-encodes all videos anyway.
+- **Chrome (Android + Desktop)** → Cloudinary + client remux to flat MP4. WhatsApp Android rejects fMP4.
 - These paths MUST stay separate. Merging them breaks one platform.
+- Detection: `isSafari` (not `isIOS`) for both MIME selection AND pipeline routing.
 
 ### Cloudinary transform MUST use `baseline:3.1`
 ```
@@ -24,21 +25,6 @@ f_mp4,vc_h264:baseline:3.1,ac_aac,af_44100,br_4m
 - `br_4m` = 4 Mbps output bitrate. Prevents Cloudinary over-compressing.
 - `q_auto` is BANNED — it changed codec unexpectedly and broke sharing.
 
-### Web Share API — files only
-```js
-navigator.share({files:[file]})  // NO title, NO text
-```
-- Adding `title` or `text` alongside `files` drops the file attachment on Chrome Android.
-- Do NOT add `canShare()` guard — returns false on valid files on some Chrome versions.
-
-### MediaRecorder — WebM on non-iOS
-- Chrome Android `isTypeSupported('video/mp4')` returns true but produces audio-only fMP4 on some devices.
-- Always prefer WebM codecs on non-iOS. iOS Safari can only record MP4.
-
-### Recording bitrate — 5 Mbps on all platforms
-- Was 2.5 Mbps on mobile. Increased to 5 Mbps to give Cloudinary a higher quality source.
-- File size is ~2-3 MB for 30s recording — acceptable.
-
 ### captureStream — Safari vs Chrome split
 ```js
 recCanvas.captureStream(isSafari ? 0 : 30);
@@ -48,6 +34,10 @@ recCanvas.captureStream(isSafari ? 0 : 30);
 - rAF watchdog in heartbeat calls `drawLoop` directly if rAF hasn't fired in >150ms.
 - Do NOT merge these paths. Each browser engine has its own broken path.
 
+### MediaRecorder — Safari prefers MP4, Chrome prefers WebM
+- `isSafari` controls MIME selection (not `isIOS`). Safari macOS 16+ supports WebM but recording as MP4 avoids the remux pipeline entirely.
+- Chrome Android `isTypeSupported('video/mp4')` returns true but produces audio-only fMP4 on some devices. Always prefer WebM on Chrome.
+
 ### No await between click and navigator.share()
 ```js
 const file = new File([blob], filename, {type:'video/mp4'}); // synchronous!
@@ -56,32 +46,68 @@ await navigator.share({files:[file]});                        // first await = s
 - Any `await` between the button click and `navigator.share()` consumes Chrome's transient user activation (5s timeout). `navigator.share()` then throws `NotAllowedError`.
 - Both pipelines already materialize their blobs before `shareOrDownload()` runs:
   - Safari: `arrayBuffer()` in `processVideoInBackground`
-  - Android: `remuxToFlatMp4()` produces in-memory blob
+  - Chrome: `remuxToFlatMp4()` produces in-memory blob
 - Do NOT add `await blob.arrayBuffer()` or any other async call before `navigator.share()`.
 - Do NOT use `blob.slice(0)` — it creates a lazy view, not a materialized copy.
 
+### Web Share API — mobile only, files only
+```js
+if(navigator.share && isMobile){ navigator.share({files:[file]}) }
+```
+- Adding `title` or `text` alongside `files` drops the file attachment on Chrome Android.
+- Do NOT add `canShare()` guard — returns false on valid files on some Chrome versions.
+- `isMobile` guard: desktop Chrome has `navigator.share` but dismissing the share dialog (AbortError) exits without downloading. Desktop skips share → goes straight to blob download.
+- No share timeout — `navigator.share()` resolves when user picks a target or cancels. A 15s timeout fires while the share sheet is still open, triggering download fallback.
+
+### Pipeline timeouts — dynamic, scaled to recording duration
+```js
+const fetchTimeout = Math.max(120000, challengeElapsed * 1500); // 1.5× duration, min 2 min
+const remuxTimeout = Math.max(30000, fmp4Blob.size / 300000 * 1000); // ~3s/MB, min 30s
+```
+- Cloudinary's first-request VP9→H264 transcode is proportional to recording duration.
+- Fixed 40s timeout failed for 10-raga challenges (128s recording on 4G).
+- Remux timeout scales with file size — larger files need more parsing + muxing time.
+
+### Remux failure → fMP4 fallback (not null)
+- If remux times out or crashes, `mp4Blob` falls back to the Cloudinary fMP4 blob.
+- fMP4 works on Telegram, email, most apps. Only older WhatsApp Android rejects fMP4.
+- Previously, remux failure set `mp4Blob=null` → button showed "Share Video" but downloaded raw WebM → WhatsApp rejected it entirely.
+- `enableDownloadButton()` checks `uploadFailed` — only shows "Download Recording" when upload/fetch actually failed.
+
+### Cleanup timer must be cancellable
+```js
+clearTimeout(cleanupTimer);
+cleanupTimer = setTimeout(cleanupCloudinary, 30000);
+```
+- The delayed Cloudinary cleanup (`setTimeout(cleanupCloudinary, 30000)`) in `shareOrDownload`'s finally block is stored in `cleanupTimer`.
+- `restart()` cancels it with `clearTimeout(cleanupTimer)`. Without this, an orphaned timer from play 1 could delete play 2's Cloudinary upload by reading the reassigned `_cdDeleteToken`.
+- `restart()` also resets `mediaRecorder` and `captureTrack` to prevent object leaks.
+
 ### mp4box.js removed — custom parser instead
 - mp4box.js could not extract samples from Chrome Android's fMP4 (onSamples never fired).
-- Custom binary parser (~130 lines) reads moov/moof/mdat boxes directly.
+- Custom binary parser (~150 lines) reads moov/moof/mdat boxes directly.
 - mp4-muxer@5.2.2 writes the flat MP4 output.
 
 ## Key Functions
-| Function | Location | Purpose |
-|----------|----------|---------|
-| `remuxToFlatMp4(fmp4Blob)` | ~line 1440 | Custom fMP4 parser → mp4-muxer flat MP4 |
-| `processVideoInBackground()` | ~line 1580 | Routes iOS/Android pipeline |
-| `shareOrDownload()` | ~line 1670 | Web Share API → download fallback |
-| `uploadToCloudinary(blob)` | ~line 1600 | Unsigned upload |
-| `cleanupCloudinary()` | after share | Deletes via delete_token |
+| Function | Purpose |
+|----------|---------|
+| `remuxToFlatMp4(fmp4Blob)` | Custom fMP4 parser → mp4-muxer flat MP4 |
+| `processVideoInBackground()` | Routes Safari/Chrome pipeline with dynamic timeouts |
+| `shareOrDownload()` | Web Share API (mobile) → download fallback (desktop) |
+| `uploadToCloudinary(blob)` | Unsigned XHR upload with progress |
+| `cleanupCloudinary()` | Deletes via delete_token |
+| `enableDownloadButton()` | Sets button label, respects `uploadFailed` state |
 
 ## Key Globals
 ```js
-let nativeMp4;        // true on iOS Safari
-let finalBlob;        // raw recording (fMP4 on iOS, WebM on Android)
-let mp4Blob;          // processed flat MP4 for sharing
+let nativeMp4;        // true on Safari (MP4 recording)
+let finalBlob;        // raw recording (fMP4 on Safari, WebM on Chrome)
+let mp4Blob;          // processed MP4 for sharing (flat or fMP4 fallback)
 let mp4DirectUrl;     // Cloudinary URL (fallback download)
 let uploadFailed;     // true → download-only mode
 let processingStarted;// once-gate
+let cleanupTimer;     // setTimeout handle — cancelled in restart()
+let captureTrack;     // CanvasCaptureMediaStreamTrack for requestFrame()
 ```
 
 ## CDN Scripts

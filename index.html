@@ -513,7 +513,7 @@ function modeLabel(){ return {easy:'Easy',notSoEasy:'Not So Easy',surpriseMe:'Su
 // ── Feedback analytics endpoint (optional Google Sheets logger) ──
 // Setup: Extensions → Apps Script → paste doPost handler → Deploy as web app (Anyone) → paste URL here
 const SHEETS_ENDPOINT = 'https://script.google.com/macros/s/AKfycbx6S-nn5jBqF3ZaYACvM-Cq_7fn9WPv7Yhyikph3F_0QhZcp4Q6FHFK6DbGQ47FiGJ1/exec';
-const APP_BUILD = '20260328-b43'; // bump this on every push so Sheets confirms which build you're testing
+const APP_BUILD = '20260328-b44'; // bump this on every push so Sheets confirms which build you're testing
 const CLOUDINARY_CLOUD = 'dfstch1ag';
 const CLOUDINARY_PRESET = 'forRagaChallange';
 const CLOUDINARY_UPLOAD_URL = 'https://api.cloudinary.com/v1_1/dfstch1ag/video/upload';
@@ -587,8 +587,8 @@ async function startCamera(){
   challengeVideo.srcObject=mediaStream;
 
   await new Promise(res=>{ previewVideo.onloadedmetadata=res; setTimeout(res,2500); });
-  try{ await previewVideo.play(); }catch(e){}
-  try{ await challengeVideo.play(); }catch(e){}
+  try{ await previewVideo.play(); }catch(e){ console.warn('[play:preview]',e.message); }
+  try{ await challengeVideo.play(); }catch(e){ console.warn('[play:challenge]',e.message); }
 
   // Update preview pills
   document.getElementById('prev-diff').textContent=difficulty[0].toUpperCase()+difficulty.slice(1);
@@ -1339,7 +1339,7 @@ function logSession(){
       connection:navigator.connection?.effectiveType||'',
       build:APP_BUILD,
     })
-  }); }catch(e){}
+  }); }catch(e){ console.warn('[logSession]',e.message); }
 }
 
 function enableDownloadButton(){
@@ -1860,16 +1860,8 @@ function fbSubmit(){
     connection:      navigator.connection?.effectiveType||'',
     timestamp:       new Date().toISOString(),
   };
-  try{
-    fetch('https://formsubmit.co/ajax/kiranrajgopal@gmail.com',{
-      method:'POST',
-      headers:{'Content-Type':'application/json','Accept':'application/json'},
-      body:JSON.stringify({...payload,_subject:'Raga Challenge Feedback',_captcha:'false'})
-    });
-  }catch(e){}
-  // Secondary: Google Sheets logger (set SHEETS_ENDPOINT above to enable)
   if(SHEETS_ENDPOINT){
-    try{ fetch(SHEETS_ENDPOINT,{method:'POST',body:JSON.stringify(payload),headers:{'Content-Type':'text/plain'}}); }catch(e){}
+    try{ fetch(SHEETS_ENDPOINT,{method:'POST',body:JSON.stringify(payload),headers:{'Content-Type':'text/plain'}}); }catch(e){ console.warn('[fbSubmit]',e.message); }
   }
   fbSheetClose();
   const strip=document.getElementById('feedback-strip');
@@ -1884,7 +1876,7 @@ function fbSubmit(){
 async function inviteFriend(){
   const text=`I just sang ${currentIdx} Carnatic raga${currentIdx===1?'':'s'} in a row 🎵 Can you beat that? Try the Raga Challenge: https://kiranrajagopalan.github.io/raga-challenge/`;
   if(navigator.share){
-    try{ await navigator.share({title:'Raga Challenge',text}); }catch(e){}
+    try{ await navigator.share({title:'Raga Challenge',text}); }catch(e){ if(e.name!=='AbortError') console.warn('[invite:share]',e.message); }
   } else {
     try{
       await navigator.clipboard.writeText(text);

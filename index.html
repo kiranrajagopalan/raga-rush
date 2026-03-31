@@ -6,7 +6,7 @@
 <meta http-equiv="Pragma" content="no-cache">
 <meta http-equiv="Expires" content="0">
 <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0">
-<title>Raga Challenge</title>
+<title>Raga Rush</title>
 <link href="https://fonts.googleapis.com/css2?family=Cormorant+Garamond:ital,wght@0,600;0,700;1,600&family=DM+Sans:opsz,wght@9..40,400;9..40,500;9..40,600;9..40,700&display=swap" rel="stylesheet">
 <script src="https://unpkg.com/@phosphor-icons/web@2.1.1"></script>
 <script src="https://cdn.jsdelivr.net/npm/mp4-muxer@5.2.2/build/mp4-muxer.min.js"></script>
@@ -326,7 +326,7 @@ html, body {
     <div class="mandala-bg"></div>
     <div class="setup-scroll">
       <div class="app-eyebrow">Carnatic</div>
-      <div class="app-title">Raga<br>Challenge</div>
+      <div class="app-title">Raga<br>Rush</div>
       <div class="app-subtitle">Improvise · Record · Share</div>
       <div class="section-label">Mode</div>
       <div class="option-group" id="diff-group">
@@ -515,7 +515,7 @@ function modeLabel(){ return {easy:'Easy',notSoEasy:'Not So Easy',surpriseMe:'Su
 // ── Feedback analytics endpoint (optional Google Sheets logger) ──
 // Setup: Extensions → Apps Script → paste doPost handler → Deploy as web app (Anyone) → paste URL here
 const SHEETS_ENDPOINT = 'https://script.google.com/macros/s/AKfycbx6S-nn5jBqF3ZaYACvM-Cq_7fn9WPv7Yhyikph3F_0QhZcp4Q6FHFK6DbGQ47FiGJ1/exec';
-const APP_BUILD = '20260331-b48'; // bump this on every push so Sheets confirms which build you're testing
+const APP_BUILD = '20260331-b49'; // bump this on every push so Sheets confirms which build you're testing
 const CLOUDINARY_CLOUD = 'dfstch1ag';
 const CLOUDINARY_PRESET = 'forRagaChallange';
 const CLOUDINARY_UPLOAD_URL = 'https://api.cloudinary.com/v1_1/dfstch1ag/video/upload';
@@ -1053,7 +1053,7 @@ function drawLoop(video,W,H,dpr=1){
       ctx.letterSpacing='2px';
       ctx.font='500 '+efs(0.024)+'px "DM Sans",sans-serif';
       ctx.fillStyle='#F5C842'; ctx.textAlign='center';
-      ctx.fillText('\u2726 RAGA CHALLENGE',W/2,CARD_BOT-H*0.010);
+      ctx.fillText('\u2726 RAGA RUSH',W/2,CARD_BOT-H*0.010);
       ctx.letterSpacing='0px';
       ctx.globalAlpha=1;
     }
@@ -1091,7 +1091,7 @@ function drawLoop(video,W,H,dpr=1){
   ctx.font='500 '+fs(0.028)+'px "DM Sans",sans-serif';
   ctx.fillStyle='rgba(245,200,66,0.82)';
   ctx.textAlign='center';
-  ctx.fillText('\u2726 RAGA CHALLENGE', W/2, topY);
+  ctx.fillText('\u2726 RAGA RUSH', W/2, topY);
 
   // ── Difficulty ──
   ctx.font='600 '+fs(0.036)+'px "DM Sans",sans-serif';
@@ -1361,7 +1361,7 @@ function enableDownloadButton(){
 function uploadToCloudinary(blob, timeout=120000){
   return new Promise((resolve,reject)=>{
     const fd=new FormData();
-    fd.append('file',blob,'raga-challenge.'+(nativeMp4?'mp4':'webm'));
+    fd.append('file',blob,'raga-rush.'+(nativeMp4?'mp4':'webm'));
     fd.append('upload_preset',CLOUDINARY_PRESET);
     const xhr=new XMLHttpRequest();
     xhr.open('POST',CLOUDINARY_UPLOAD_URL);
@@ -1726,11 +1726,11 @@ async function shareOrDownload(){
       // No MP4 — download raw recording as fallback
       const rawBlob=finalBlob;
       if(!rawBlob){ alert('No recording found.'); return; }
-      downloadBlob(rawBlob, 'raga-challenge-'+difficulty+'-'+Date.now()+'.'+(nativeMp4?'mp4':'webm'));
+      downloadBlob(rawBlob, 'raga-rush-'+difficulty+'-'+Date.now()+'.'+(nativeMp4?'mp4':'webm'));
       if(!fbShared){ fbShared=true; showFeedbackProminent(); }
       return;
     }
-    const filename='raga-challenge-'+difficulty+'-'+Date.now()+'.mp4';
+    const filename='raga-rush-'+difficulty+'-'+Date.now()+'.mp4';
     // Create File synchronously from blob — no await before navigator.share().
     // Any await between click and share() consumes Chrome's transient user activation,
     // causing NotAllowedError. Both pipelines already materialize their blobs:
@@ -1745,7 +1745,11 @@ async function shareOrDownload(){
     let shared=false;
     if(navigator.share && isMobile){
       try{
-        await navigator.share({files:[file]});
+        // Safari/iOS: safe to include text — caption appears below video in WhatsApp
+        // Chrome Android: text drops the file attachment, so files-only
+        const shareObj={files:[file]};
+        if(nativeMp4) shareObj.text=`I sang ${currentIdx} raga${currentIdx===1?'':'s'} on Raga Rush 🎵 Can you beat me? 👉 https://karnatricks.com/raga-rush`;
+        await navigator.share(shareObj);
         shared=true;
       }catch(e){
         if(e.name==='AbortError') return;
@@ -1898,9 +1902,9 @@ function fbSubmit(){
 }
 
 async function inviteFriend(){
-  const text=`I just sang ${currentIdx} Carnatic raga${currentIdx===1?'':'s'} in a row 🎵 Can you beat that? Try the Raga Challenge: https://kiranrajagopalan.github.io/raga-challenge/`;
+  const text=`I just sang ${currentIdx} Carnatic raga${currentIdx===1?'':'s'} on Raga Rush 🎵 Think you can beat that? Play it free: https://karnatricks.com/raga-rush`;
   if(navigator.share){
-    try{ await navigator.share({title:'Raga Challenge',text}); }catch(e){ if(e.name!=='AbortError') console.warn('[invite:share]',e.message); }
+    try{ await navigator.share({title:'Raga Rush',text}); }catch(e){ if(e.name!=='AbortError') console.warn('[invite:share]',e.message); }
   } else {
     try{
       await navigator.clipboard.writeText(text);
@@ -1991,7 +1995,7 @@ function showScreen(id){
 // ─────────────────────────────────────────────────────────────
 // CANVAS DEBUG MODE  —  ?debug in URL activates a dev overlay
 // Renders all recording canvas states without camera access.
-// Usage: http://localhost:8000/raga-challenge.html?debug
+// Usage: http://localhost:8000/raga-rush.html?debug
 // ─────────────────────────────────────────────────────────────
 (function(){
   if(!new URLSearchParams(location.search).has('debug')) return;

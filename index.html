@@ -513,7 +513,7 @@ function modeLabel(){ return {easy:'Easy',notSoEasy:'Not So Easy',surpriseMe:'Su
 // ── Feedback analytics endpoint (optional Google Sheets logger) ──
 // Setup: Extensions → Apps Script → paste doPost handler → Deploy as web app (Anyone) → paste URL here
 const SHEETS_ENDPOINT = 'https://script.google.com/macros/s/AKfycbx6S-nn5jBqF3ZaYACvM-Cq_7fn9WPv7Yhyikph3F_0QhZcp4Q6FHFK6DbGQ47FiGJ1/exec';
-const APP_BUILD = '20260328-b45'; // bump this on every push so Sheets confirms which build you're testing
+const APP_BUILD = '20260331-b46'; // bump this on every push so Sheets confirms which build you're testing
 const CLOUDINARY_CLOUD = 'dfstch1ag';
 const CLOUDINARY_PRESET = 'forRagaChallange';
 const CLOUDINARY_UPLOAD_URL = 'https://api.cloudinary.com/v1_1/dfstch1ag/video/upload';
@@ -539,7 +539,10 @@ let slotSpinning=false, ragaRevealAt=0, ragaRevealName='';
 let fbReaction=null, fbShared=false;
 let captureTrack=null; // CanvasCaptureMediaStreamTrack for frame-on-demand (Bug 1 fix)
 let cleanupTimer=null; // setTimeout handle for delayed Cloudinary cleanup — must be cancellable
+let statusRotationInterval=null; // rotating status words during video processing
+let _wakeLock=null; // Screen Wake Lock — keeps screen on during upload/transcode
 const DRAW_INTERVAL=1000/30; // target 30fps draw rate
+const STATUS_WORDS=['Ragafying','Swaralizing','Gamakifying','Alankarating','Melakarting','Pallaving','Thanamizing','Alapanating','Korvailing','Charanaming','Sangeetifying','Taalasizing'];
 const DONE_TITLES=[
   'Todi\u2011ally crushed it!',
   'Kapi\u2011tal performance!',
@@ -1372,7 +1375,7 @@ function uploadToCloudinary(blob, timeout=120000){
     xhr.upload.onprogress=e=>{
       if(e.lengthComputable){
         const pct=Math.round((e.loaded/e.total)*75);
-        setConv(5+pct,'Uploading\u2026 '+Math.round((e.loaded/e.total)*100)+'%');
+        setConvPct(5+pct);
       }
     };
     xhr.onload=()=>{
@@ -1621,6 +1624,12 @@ async function processVideoInBackground(){
   // Safari macOS doesn't need flat MP4; Chrome Android does (WhatsApp Android rejects fMP4).
   const _isSafari=(/Safari/.test(navigator.userAgent)&&!/Chrome/.test(navigator.userAgent));
 
+  // Keep screen awake during upload/transcode — phone sleeping kills network requests.
+  try{ _wakeLock=await navigator.wakeLock.request('screen'); }catch(e){}
+
+  // Start rotating status words (replaces static "Uploading…/Converting…")
+  startStatusRotation();
+
   try{
     // Dynamic timeouts: both upload and transcode-fetch scale with recording duration.
     // Upload: 2× recording time (floor 120s) — covers large VP9 blobs on slow 4g.
@@ -1630,10 +1639,10 @@ async function processVideoInBackground(){
 
     if(_isSafari){
       // ── Path A: Safari (iOS + macOS) → Cloudinary only ──
-      setConv(5,'Uploading\u2026');
+      setConvPct(5);
       const uploadResult=await uploadToCloudinary(finalBlob, uploadTimeout);
       if(uploadResult.delete_token) _cdDeleteToken=uploadResult.delete_token;
-      setConv(80,'Converting\u2026');
+      setConvPct(80);
       const mp4Url=uploadResult.secure_url.replace(/\/upload\//,'/upload/f_mp4,vc_h264:baseline:3.1,ac_aac,af_44100,br_4m/').replace(/\.[^.]+$/,'.mp4');
       mp4DirectUrl=mp4Url;
       const fetchAbort=new AbortController();
@@ -1647,12 +1656,12 @@ async function processVideoInBackground(){
       clearTimeout(fetchTimer);
     } else {
       // ── Path B: Android/Desktop → Cloudinary + client-side remux ──
-      setConv(5,'Uploading\u2026');
+      setConvPct(5);
       const uploadResult=await uploadToCloudinary(finalBlob, uploadTimeout);
       if(uploadResult.delete_token) _cdDeleteToken=uploadResult.delete_token;
 
       // Step 2: Fetch Cloudinary's fMP4 output (H264+AAC but fragmented)
-      setConv(70,'Converting\u2026');
+      setConvPct(70);
       const mp4Url=uploadResult.secure_url.replace(/\/upload\//,'/upload/f_mp4,vc_h264:baseline:3.1,ac_aac,af_44100,br_4m/').replace(/\.[^.]+$/,'.mp4');
       mp4DirectUrl=mp4Url;
       const fetchAbort=new AbortController();
@@ -1664,7 +1673,7 @@ async function processVideoInBackground(){
       // Step 3: Client-side remux fMP4 → flat MP4 (WhatsApp Android needs flat MP4)
       // If remux fails (timeout, memory, parsing), fall back to Cloudinary's fMP4.
       // fMP4 may not work on older WhatsApp but works on Telegram, email, most apps.
-      setConv(85,'Optimising\u2026');
+      setConvPct(85);
       const remuxTimeout=Math.max(30000, Math.round(fmp4Blob.size/300000)*1000); // ~3s per MB, min 30s
       try{
         const _timeout=new Promise((_,r)=>setTimeout(()=>r(new Error('remux timeout')),remuxTimeout));
@@ -1681,15 +1690,27 @@ async function processVideoInBackground(){
     uploadFailed=true;
   }
 
+  // Release wake lock + stop status rotation
+  stopStatusRotation();
+  try{ if(_wakeLock){ _wakeLock.release(); _wakeLock=null; } }catch(e){}
+
   clearTimeout(processingGuard);
   if(isOnDone()) enableDownloadButton();
 }
 
-function setConv(pct,msg){
-  const lb=document.getElementById('dl-label');
+function setConvPct(pct){
   const pb=document.getElementById('btn-progress');
-  if(lb) lb.innerHTML='<i class="ph-bold ph-circle-notch spin-icon"></i> '+msg;
   if(pb) pb.style.width=pct+'%';
+}
+function startStatusRotation(){
+  let idx=Math.floor(Math.random()*STATUS_WORDS.length);
+  const lb=document.getElementById('dl-label');
+  const show=()=>{ if(lb) lb.innerHTML='<i class="ph-bold ph-circle-notch spin-icon"></i> '+STATUS_WORDS[idx]+'\u2026'; idx=(idx+1)%STATUS_WORDS.length; };
+  show();
+  statusRotationInterval=setInterval(show, 2500);
+}
+function stopStatusRotation(){
+  clearInterval(statusRotationInterval); statusRotationInterval=null;
 }
 
 
@@ -1892,6 +1913,8 @@ async function inviteFriend(){
 
 function restart(){
   clearTimeout(cleanupTimer); cleanupTimer=null; // cancel orphaned cleanup timer from previous play
+  stopStatusRotation(); // stop rotating status words if still running
+  try{ if(_wakeLock){ _wakeLock.release(); _wakeLock=null; } }catch(e){} // release screen wake lock
   cleanupCloudinary(); _cdDeleteToken=null;
   clearTimeout(processingGuard);
   clearInterval(captureHeartbeat); captureHeartbeat=null;

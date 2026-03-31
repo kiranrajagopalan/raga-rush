@@ -225,6 +225,8 @@ html, body {
 .download-btn:disabled { opacity:0.5; cursor:not-allowed; }
 .download-btn.processing { opacity:0.75; cursor:default; }
 .btn-progress { position:absolute; bottom:0; left:0; height:3px; background:rgba(0,0,0,0.25); border-radius:0 0 14px 14px; transition:width 0.5s ease; width:0%; pointer-events:none; }
+#dl-label { display:inline-block; transition:opacity 0.3s ease,transform 0.3s ease; }
+#dl-label.fade-out { opacity:0; transform:translateY(-6px); }
 .dl-skip-link { display:none; text-align:center; font-size:12px; color:rgba(255,255,255,0.3); cursor:pointer; padding:2px 0 4px; font-family:var(--font); transition:color 0.2s; }
 .dl-skip-link:hover { color:rgba(255,255,255,0.6); }
 .invite-btn { width:100%; padding:4.5%; background:transparent; border:1px solid var(--gold); color:var(--gold); border-radius:14px; font-family:var(--font); font-size:16px; font-weight:600; cursor:pointer; transition:all 0.2s; letter-spacing:0.3px; }
@@ -513,7 +515,7 @@ function modeLabel(){ return {easy:'Easy',notSoEasy:'Not So Easy',surpriseMe:'Su
 // ── Feedback analytics endpoint (optional Google Sheets logger) ──
 // Setup: Extensions → Apps Script → paste doPost handler → Deploy as web app (Anyone) → paste URL here
 const SHEETS_ENDPOINT = 'https://script.google.com/macros/s/AKfycbx6S-nn5jBqF3ZaYACvM-Cq_7fn9WPv7Yhyikph3F_0QhZcp4Q6FHFK6DbGQ47FiGJ1/exec';
-const APP_BUILD = '20260331-b46'; // bump this on every push so Sheets confirms which build you're testing
+const APP_BUILD = '20260331-b47'; // bump this on every push so Sheets confirms which build you're testing
 const CLOUDINARY_CLOUD = 'dfstch1ag';
 const CLOUDINARY_PRESET = 'forRagaChallange';
 const CLOUDINARY_UPLOAD_URL = 'https://api.cloudinary.com/v1_1/dfstch1ag/video/upload';
@@ -542,7 +544,7 @@ let cleanupTimer=null; // setTimeout handle for delayed Cloudinary cleanup — m
 let statusRotationInterval=null; // rotating status words during video processing
 let _wakeLock=null; // Screen Wake Lock — keeps screen on during upload/transcode
 const DRAW_INTERVAL=1000/30; // target 30fps draw rate
-const STATUS_WORDS=['Ragafying','Swaralizing','Gamakifying','Alankarating','Melakarting','Pallaving','Thanamizing','Alapanating','Korvailing','Charanaming','Sangeetifying','Taalasizing'];
+const STATUS_WORDS=['Ragafying','Preparing your video','Gamakifying','Swaralizing','Getting it ready','Taalasizing'];
 const DONE_TITLES=[
   'Todi\u2011ally crushed it!',
   'Kapi\u2011tal performance!',
@@ -1705,9 +1707,18 @@ function setConvPct(pct){
 function startStatusRotation(){
   let idx=Math.floor(Math.random()*STATUS_WORDS.length);
   const lb=document.getElementById('dl-label');
-  const show=()=>{ if(lb) lb.innerHTML='<i class="ph-bold ph-circle-notch spin-icon"></i> '+STATUS_WORDS[idx]+'\u2026'; idx=(idx+1)%STATUS_WORDS.length; };
-  show();
-  statusRotationInterval=setInterval(show, 2500);
+  if(!lb) return;
+  // Show first word immediately (no fade)
+  lb.innerHTML='<i class="ph-bold ph-circle-notch spin-icon"></i> '+STATUS_WORDS[idx]+'\u2026';
+  idx=(idx+1)%STATUS_WORDS.length;
+  statusRotationInterval=setInterval(()=>{
+    lb.classList.add('fade-out');
+    setTimeout(()=>{
+      lb.innerHTML='<i class="ph-bold ph-circle-notch spin-icon"></i> '+STATUS_WORDS[idx]+'\u2026';
+      idx=(idx+1)%STATUS_WORDS.length;
+      lb.classList.remove('fade-out');
+    },300);
+  }, 3000);
 }
 function stopStatusRotation(){
   clearInterval(statusRotationInterval); statusRotationInterval=null;

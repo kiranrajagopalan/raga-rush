@@ -513,7 +513,7 @@ function modeLabel(){ return {easy:'Easy',notSoEasy:'Not So Easy',surpriseMe:'Su
 // ── Feedback analytics endpoint (optional Google Sheets logger) ──
 // Setup: Extensions → Apps Script → paste doPost handler → Deploy as web app (Anyone) → paste URL here
 const SHEETS_ENDPOINT = 'https://script.google.com/macros/s/AKfycbx6S-nn5jBqF3ZaYACvM-Cq_7fn9WPv7Yhyikph3F_0QhZcp4Q6FHFK6DbGQ47FiGJ1/exec';
-const APP_BUILD = '20260328-b44'; // bump this on every push so Sheets confirms which build you're testing
+const APP_BUILD = '20260328-b45'; // bump this on every push so Sheets confirms which build you're testing
 const CLOUDINARY_CLOUD = 'dfstch1ag';
 const CLOUDINARY_PRESET = 'forRagaChallange';
 const CLOUDINARY_UPLOAD_URL = 'https://api.cloudinary.com/v1_1/dfstch1ag/video/upload';
@@ -1362,7 +1362,7 @@ function enableDownloadButton(){
 
 // Upload raw recording blob to Cloudinary. Returns JSON with secure_url + delete_token.
 // Uses XHR (not fetch) for upload.onprogress support on mobile.
-function uploadToCloudinary(blob){
+function uploadToCloudinary(blob, timeout=120000){
   return new Promise((resolve,reject)=>{
     const fd=new FormData();
     fd.append('file',blob,'raga-challenge.'+(nativeMp4?'mp4':'webm'));
@@ -1385,7 +1385,7 @@ function uploadToCloudinary(blob){
     };
     xhr.onerror=()=>reject(new Error('upload:network error'));
     xhr.ontimeout=()=>reject(new Error('upload:timeout'));
-    xhr.timeout=120000; // 2 min for large files on slow mobile
+    xhr.timeout=timeout;
     xhr.send(fd);
   });
 }
@@ -1622,15 +1622,16 @@ async function processVideoInBackground(){
   const _isSafari=(/Safari/.test(navigator.userAgent)&&!/Chrome/.test(navigator.userAgent));
 
   try{
-    // Dynamic fetch timeout: Cloudinary's first-request transcode is proportional to
-    // recording duration. VP9→H264 (Android) is slower than H264→H264 (Safari).
-    // Use 1.5× recording time with generous floor of 120s.
-    const fetchTimeout=Math.max(120000, Math.round(challengeElapsed*1500));
+    // Dynamic timeouts: both upload and transcode-fetch scale with recording duration.
+    // Upload: 2× recording time (floor 120s) — covers large VP9 blobs on slow 4g.
+    // Fetch:  2× recording time (floor 120s) — covers VP9→H264 transcode on free tier.
+    const uploadTimeout=Math.max(120000, Math.round(challengeElapsed*2000));
+    const fetchTimeout =Math.max(120000, Math.round(challengeElapsed*2000));
 
     if(_isSafari){
       // ── Path A: Safari (iOS + macOS) → Cloudinary only ──
       setConv(5,'Uploading\u2026');
-      const uploadResult=await uploadToCloudinary(finalBlob);
+      const uploadResult=await uploadToCloudinary(finalBlob, uploadTimeout);
       if(uploadResult.delete_token) _cdDeleteToken=uploadResult.delete_token;
       setConv(80,'Converting\u2026');
       const mp4Url=uploadResult.secure_url.replace(/\/upload\//,'/upload/f_mp4,vc_h264:baseline:3.1,ac_aac,af_44100,br_4m/').replace(/\.[^.]+$/,'.mp4');
@@ -1647,7 +1648,7 @@ async function processVideoInBackground(){
     } else {
       // ── Path B: Android/Desktop → Cloudinary + client-side remux ──
       setConv(5,'Uploading\u2026');
-      const uploadResult=await uploadToCloudinary(finalBlob);
+      const uploadResult=await uploadToCloudinary(finalBlob, uploadTimeout);
       if(uploadResult.delete_token) _cdDeleteToken=uploadResult.delete_token;
 
       // Step 2: Fetch Cloudinary's fMP4 output (H264+AAC but fragmented)

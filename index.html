@@ -488,20 +488,20 @@ html, body {
 </div>
 <script>
 const RAGAS = {
-  easy:['Hanumathodi','Māyāmālavagowla','Kīravāni','Kharaharapriya','Gowrimanohari','Charukeshi','Shankarābharanam','Kāmavardhini','Shanmukhapriya','Vāchaspathi','Mechakalyāni','Sindhu Bhairavi','Sāvēri','Malayamārutham','Valachi','Vasanthā','Ānandabhairavi','Bhairavi','Hindholam','Sāramathi','Suddha Dhanyāsi','Ābhēri','Abhōgi','Bāgēshri','Brindāvanasāranga','Hindusthāni Kāpi','Kānada','Madhyamāvathi','Rīthigowla','Shrīrāga','Nalinakānthi','Bahudhari','Dvijāvanthi','Kāmbhoji','Kamās','Mohana','Sahāna','Surati','Thilang','Arabhi','Atāna','Begada','Bēhāg','Bilāhari','Hamsadhvani','Kadhana Kuthūhalam','Kēdhāram','Nīlāmbari','Nāta','Pūrvikalyāni','Hamsanādham','Sarasvathi','Hamirkalyāni','Mohanakalyāni','Yamunākalyāni','Amruthavarshini'],
-  medium:['Gānamūrthi','Chakravākam','Natabhairavi','Harikāmbhoji','Chalanāta','Shubhapanthuvarāli','Simhendra Madhyamam','Hemāvathi','Dharmāvathi','Lathāngi','Jyothisvarūpini','Nāsikabhūshani','Rasikapriya','Āhiri','Bhūpālam','Dhanyāsi','Punnāgavarāli','Bowli','Gowla','Jaganmōhini','Lalithā','Malahāri','Nādhanāmakriya','Rēvagupthi','Bindhumālini','Mārgahindholam','Kalyāna Vasantham','Āndholika','Chiththaranjani','Dharbāru','Husēni','Manirangu','Mukhāri','Sālakabhairavi','Shrīranjani','Suddha Bangāla','Kamalāmanōhari','Kāpinārayani','Karnātaka Bēhāg','Kedhāragowla','Kunthalavarāli','Nāgasvarāvali','Nātakurānji','Navarasa Kannada','Ravichandhrika','Sāma','Yadhukulakāmbhoji','Dhēvagāndhāri','Hindusthāni Bēhāg','Kurānji','Mānd','Pūrnachandhrika','Suddha Sāvēri','Gambhiranāta','Varāli','Hamsānandhi','Madhuvanthi','Ranjani','Sāranga'],
+  easy:['Hanumathodi','Māyāmālavagowla','Kīravāni','Kharaharapriya','Gowrimanohari','Charukeshi','Shankarābharanam','Kāmavardhini','Shanmukhapriya','Vāchaspathi','Mechakalyāni','Sindhu Bhairavi','Sāvēri','Malayamārutham','Valachi','Vasanthā','Ānandabhairavi','Bhairavi','Hindholam','Sāramathi','Suddha Dhanyāsi','Ābhēri','Abhōgi','Bāgēshri','Brindāvanasāranga','Kāpi','Kānada','Madhyamāvathi','Rīthigowla','Shrīrāga','Nalinakānthi','Bahudhari','Dvijāvanthi','Kāmbhoji','Kamās','Mohana','Sahāna','Surati','Thilang','Arabhi','Atāna','Begada','Bēhāg','Bilāhari','Hamsadhvani','Kadhana Kuthūhalam','Kēdhāram','Nīlāmbari','Nāta','Pūrvikalyāni','Hamsanādham','Sarasvathi','Hamirkalyāni','Mohanakalyāni','Yamunākalyāni','Amruthavarshini'],
+  medium:['Gānamūrthi','Chakravākam','Natabhairavi','Harikāmbhoji','Chalanāta','Shubhapanthuvarāli','Simhendra Madhyamam','Hemāvathi','Dharmāvathi','Lathāngi','Jyothisvarūpini','Nāsikabhūshani','Rasikapriya','Āhiri','Bhūpālam','Dhanyāsi','Punnāgavarāli','Bowli','Gowla','Jaganmōhini','Lalithā','Malahāri','Nādhanāmakriya','Rēvagupthi','Bindhumālini','Mārgahindholam','Kalyāna Vasantham','Āndholika','Chiththaranjani','Dharbāru','Husēni','Manirangu','Mukhāri','Sālakabhairavi','Shrīranjani','Suddha Bangāla','Kamalāmanōhari','Kāpinārayani','Kedhāragowla','Kunthalavarāli','Nāgasvarāvali','Nātakurānji','Navarasa Kannada','Ravichandhrika','Sāma','Yadhukulakāmbhoji','Dhēvagāndhāri','Kurānji','Mānd','Pūrnachandhrika','Suddha Sāvēri','Gambhiranāta','Varāli','Hamsānandhi','Madhuvanthi','Ranjani','Sāranga'],
   hard:['Kanakangi','Rathnāngi','Vanaspathi','Sēnāvathi','Dhēnukā','Nātakapriya','Kōkilapriya','Vakulābharanam','Sūryakāntam','Jankāradhvani','Varunapriya','Sarasāngi','Vāgadhīsvari','Pāvani','Bhavapriya','Gamanashrama','Rishabhapriya','Kosalam','Gowlipanthu','Gujjari','Pharaz','Sindhu Rāmakriya','Kalāvathi','Sowrāshtram','Pūrnalalitha','Jayanthashrī','Pūrnashajja','Jayanthasēna','Nāyaki','Nārāyani','Bangāla','Janaranjani','Kannada','Navaroj','Chandhrajyothi']
 };
 
 const SURPRISE_THEMES = [
   { name:'The "Priya" Family',         reveal:"Every raga you just sang has 'priya' (beloved) in its name.",                                              pool:['Kharaharapriya','Shanmukhapriya','Rasikapriya','Nātakapriya','Varunapriya','Bhavapriya','Rishabhapriya'] },
   { name:'The "Kalyāni" Family',        reveal:'Six faces of Kalyāni — all named after the same beloved scale.',                                           pool:['Mechakalyāni','Hamirkalyāni','Mohanakalyāni','Yamunākalyāni','Pūrvikalyāni','Kalyāna Vasantham'] },
-  { name:'Children of Shankarābharanam',reveal:'Same 7 svaras as Shankarābharanam (Mela 29) — completely different personalities.',                        pool:['Arabhi','Bilāhari','Hamsadhvani','Bēhāg','Nīlāmbari','Kēdhāram','Suddha Sāvēri','Dhēvagāndhāri','Mānd','Hindusthāni Bēhāg','Kurānji','Pūrnachandhrika','Janaranjani','Kannada','Navaroj','Bangāla'] },
-  { name:'Children of Kharaharapriya',  reveal:'Siblings that sound nothing alike — all share the parent scale Kharaharapriya (Mela 22).',                 pool:['Ābhēri','Abhōgi','Brindāvanasāranga','Bāgēshri','Madhyamāvathi','Shrīrāga','Hindusthāni Kāpi','Mukhāri','Dharbāru','Shrīranjani','Husēni'] },
+  { name:'Children of Shankarābharanam',reveal:'Same 7 svaras as Shankarābharanam (Mela 29) — completely different personalities.',                        pool:['Arabhi','Bilāhari','Hamsadhvani','Bēhāg','Nīlāmbari','Kēdhāram','Suddha Sāvēri','Dhēvagāndhāri','Mānd','Kurānji','Pūrnachandhrika','Janaranjani','Kannada','Navaroj','Bangāla'] },
+  { name:'Children of Kharaharapriya',  reveal:'Siblings that sound nothing alike — all share the parent scale Kharaharapriya (Mela 22).',                 pool:['Ābhēri','Abhōgi','Brindāvanasāranga','Bāgēshri','Madhyamāvathi','Shrīrāga','Kāpi','Mukhāri','Dharbāru','Shrīranjani','Husēni'] },
   { name:'The Pentatonic Club',         reveal:'Every raga in this session uses exactly 5 notes.',                                                          pool:['Hindholam','Abhōgi','Mohana','Hamsadhvani','Madhyamāvathi','Ābhēri','Amruthavarshini'] },
   { name:'The Sharp Fourth',            reveal:'Every raga you sang uses the sharp fourth (tivra Ma) — that distinctive lift in the scale.',                pool:['Mechakalyāni','Kāmavardhini','Vāchaspathi','Pūrvikalyāni','Hamirkalyāni','Mohanakalyāni','Yamunākalyāni','Amruthavarshini','Shanmukhapriya','Simhendra Madhyamam','Hemāvathi','Dharmāvathi','Hamsānandhi','Madhuvanthi','Ranjani','Sāranga','Varāli'] },
   { name:'The Bhairavi Clan',           reveal:'All roads lead to Bhairavi — four ragas, one ancient name.',                                               pool:['Bhairavi','Ānandabhairavi','Sindhu Bhairavi','Natabhairavi'] },
-  { name:'The Hindustani Visitors',     reveal:'Every raga in this session crossed the Vindhyas — all have Hindustani roots.',                             pool:['Bēhāg','Hindusthāni Kāpi','Bāgēshri','Mānd','Hindusthāni Bēhāg','Husēni','Dharbāru'] },
+  { name:'The Hindustani Visitors',     reveal:'Every raga in this session crossed the Vindhyas — all have Hindustani roots.',                             pool:['Bēhāg','Bāgēshri','Mānd','Husēni','Dharbāru'] },
   { name:'The Atlas',                   reveal:'A musical map — every raga in this session is named after a place.',                                        pool:['Kēdhāram','Sindhu Bhairavi','Kannada','Bangāla','Gujjari','Kosalam','Pharaz','Sindhu Rāmakriya'] },
   { name:'The Zoo',                     reveal:'Swan, cuckoo, lion, serpent — every raga in this session is named after a creature.',                       pool:['Hamsadhvani','Hamsānandhi','Simhendra Madhyamam','Nāgasvarāvali','Kōkilapriya'] },
   { name:'Cosmic Light Show',           reveal:'Sun, moon, and light — every raga carries a celestial name.',                                              pool:['Pūrnachandhrika','Jyothisvarūpini','Sūryakāntam','Chandhrajyothi'] },
@@ -515,7 +515,7 @@ function modeLabel(){ return {easy:'Easy',notSoEasy:'Not So Easy',surpriseMe:'Su
 // ── Feedback analytics endpoint (optional Google Sheets logger) ──
 // Setup: Extensions → Apps Script → paste doPost handler → Deploy as web app (Anyone) → paste URL here
 const SHEETS_ENDPOINT = 'https://script.google.com/macros/s/AKfycbx6S-nn5jBqF3ZaYACvM-Cq_7fn9WPv7Yhyikph3F_0QhZcp4Q6FHFK6DbGQ47FiGJ1/exec';
-const APP_BUILD = '20260331-b49'; // bump this on every push so Sheets confirms which build you're testing
+const APP_BUILD = '20260331-b50'; // bump this on every push so Sheets confirms which build you're testing
 const CLOUDINARY_CLOUD = 'dfstch1ag';
 const CLOUDINARY_PRESET = 'forRagaChallange';
 const CLOUDINARY_UPLOAD_URL = 'https://api.cloudinary.com/v1_1/dfstch1ag/video/upload';
@@ -1748,7 +1748,7 @@ async function shareOrDownload(){
         // Safari/iOS: safe to include text — caption appears below video in WhatsApp
         // Chrome Android: text drops the file attachment, so files-only
         const shareObj={files:[file]};
-        if(nativeMp4) shareObj.text=`I sang ${currentIdx} raga${currentIdx===1?'':'s'} on Raga Rush 🎵 Can you beat me? 👉 https://karnatricks.com/raga-rush`;
+        if(nativeMp4) shareObj.text=`I sang ${currentIdx} raga${currentIdx===1?'':'s'} on Raga Rush 🎵 Can you beat me? 👉 https://karnatricks.com/raga-challenge`;
         await navigator.share(shareObj);
         shared=true;
       }catch(e){
@@ -1902,7 +1902,7 @@ function fbSubmit(){
 }
 
 async function inviteFriend(){
-  const text=`I just sang ${currentIdx} Carnatic raga${currentIdx===1?'':'s'} on Raga Rush 🎵 Think you can beat that? Play it free: https://karnatricks.com/raga-rush`;
+  const text=`I just sang ${currentIdx} Carnatic raga${currentIdx===1?'':'s'} on Raga Rush 🎵 Think you can beat that? Play it free: https://karnatricks.com/raga-challenge`;
   if(navigator.share){
     try{ await navigator.share({title:'Raga Rush',text}); }catch(e){ if(e.name!=='AbortError') console.warn('[invite:share]',e.message); }
   } else {

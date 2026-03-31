@@ -11,7 +11,7 @@ Ragas are classified into four tiers. Only Easy, Medium, and Hard are used in th
 | Tier | Count | Description |
 |------|-------|-------------|
 | Easy | 57 | Core well-known ragas |
-| Medium | 59 | Moderately challenging ragas |
+| Medium | 57 | Moderately challenging ragas |
 | Hard | 35 | Demanding ragas |
 | Rare | 134 | Too obscure for regular practice — kept in reference only |
 | **Active total** | **151** | Used across all three modes |
@@ -123,7 +123,6 @@ Ragas are classified into four tiers. Only Easy, Medium, and Hard are used in th
 | Suddha Sāvēri | Medium |
 | Dhēvagāndhāri | Medium |
 | Mānd | Medium |
-| Hindusthāni Bēhāg | Medium |
 | Kurānji | Medium |
 | Pūrnachandhrika | Medium |
 | Janaranjani | Hard |
@@ -147,7 +146,7 @@ Ragas are classified into four tiers. Only Easy, Medium, and Hard are used in th
 | Bāgēshri | Easy |
 | Madhyamāvathi | Easy |
 | Shrīrāga | Easy |
-| Hindusthāni Kāpi | Easy |
+| Kāpi | Easy |
 | Mukhāri | Medium |
 | Dharbāru | Medium |
 | Shrīranjani | Medium |
@@ -225,14 +224,12 @@ Ragas are classified into four tiers. Only Easy, Medium, and Hard are used in th
 | Raga | Tier |
 |------|------|
 | Bēhāg | Easy |
-| Hindusthāni Kāpi | Easy |
 | Bāgēshri | Easy |
 | Mānd | Medium |
-| Hindusthāni Bēhāg | Medium |
 | Husēni | Medium |
 | Dharbāru | Medium |
 
-**Pool size:** 7
+**Pool size:** 5
 **Reveal text:** *"Every raga in this session crossed the Vindhyas — all have Hindustani roots."*
 
 ---
@@ -308,12 +305,12 @@ Ragas are classified into four tiers. Only Easy, Medium, and Hard are used in th
 |---|------|-----------|-----------|
 | 1 | The "Priya" Family | Name suffix "-priya" | 7 |
 | 2 | The "Kalyāni" Family | Name contains "kalyāni" | 6 |
-| 3 | Children of Shankarābharanam | Parent mela 29 | 16 |
+| 3 | Children of Shankarābharanam | Parent mela 29 | 15 |
 | 4 | Children of Kharaharapriya | Parent mela 22 | 11 |
 | 5 | The Pentatonic Club | 5-svara ragas (audava) | 7 |
 | 6 | The Sharp Fourth | Uses M2 / tivra Ma | 17 |
 | 7 | The Bhairavi Clan | Name suffix "-bhairavi" | 4 |
-| 8 | The Hindustani Visitors | Hindustani origin | 7 |
+| 8 | The Hindustani Visitors | Hindustani origin | 5 |
 | 9 | The Atlas | Named after places | 8 |
 | 10 | The Zoo | Named after creatures | 5 |
 | 11 | Cosmic Light Show | Celestial names | 4 |

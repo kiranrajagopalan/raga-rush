@@ -515,7 +515,7 @@ function modeLabel(){ return {easy:'Easy',notSoEasy:'Not So Easy',surpriseMe:'Su
 // ── Feedback analytics endpoint (optional Google Sheets logger) ──
 // Setup: Extensions → Apps Script → paste doPost handler → Deploy as web app (Anyone) → paste URL here
 const SHEETS_ENDPOINT = 'https://script.google.com/macros/s/AKfycbx6S-nn5jBqF3ZaYACvM-Cq_7fn9WPv7Yhyikph3F_0QhZcp4Q6FHFK6DbGQ47FiGJ1/exec';
-const APP_BUILD = '20260331-b47'; // bump this on every push so Sheets confirms which build you're testing
+const APP_BUILD = '20260331-b48'; // bump this on every push so Sheets confirms which build you're testing
 const CLOUDINARY_CLOUD = 'dfstch1ag';
 const CLOUDINARY_PRESET = 'forRagaChallange';
 const CLOUDINARY_UPLOAD_URL = 'https://api.cloudinary.com/v1_1/dfstch1ag/video/upload';
@@ -929,9 +929,8 @@ function drawLoop(video,W,H,dpr=1){
     ctx.font='700 '+cdFS+'px "DM Sans",sans-serif';
     ctx.fillStyle=isGo?'#F5C842':'white';
     ctx.textAlign='center'; ctx.textBaseline='middle';
-    ctx.shadowColor='rgba(245,200,66,0.6)'; ctx.shadowBlur=60;
     ctx.fillText(countdownText,W/2,H/2);
-    ctx.shadowBlur=0; ctx.textBaseline='alphabetic';
+    ctx.textBaseline='alphabetic';
     captureTrack?.requestFrame?.(); // push countdown frame to MediaRecorder
     requestAnimationFrame(()=>drawLoop(video,W,H,dpr));
     return;
@@ -1131,11 +1130,7 @@ function drawLoop(video,W,H,dpr=1){
       const isTop=el.classList.contains('center');
       ctx.fillStyle=isTop?'white':'rgba(255,255,255,0.20)';
       if(isTop){
-        ctx.shadowColor='rgba(245,200,66,0.9)'; ctx.shadowBlur=22;
         ctx.fillText(el.textContent,W/2,cy2+fsize*0.36);
-        ctx.shadowColor='rgba(245,200,66,0.3)'; ctx.shadowBlur=55;
-        ctx.fillText(el.textContent,W/2,cy2+fsize*0.36);
-        ctx.shadowBlur=0;
       } else {
         ctx.fillText(el.textContent,W/2,cy2+fsize*0.36);
       }
@@ -1147,9 +1142,7 @@ function drawLoop(video,W,H,dpr=1){
     lg.addColorStop(0,'transparent'); lg.addColorStop(0.08,'rgba(245,200,66,0.85)');
     lg.addColorStop(0.92,'rgba(245,200,66,0.85)'); lg.addColorStop(1,'transparent');
     ctx.strokeStyle=lg; ctx.lineWidth=1.5;
-    ctx.shadowColor='rgba(245,200,66,0.45)'; ctx.shadowBlur=8;
     ctx.beginPath(); ctx.moveTo(W*0.04,lineY); ctx.lineTo(W*0.96,lineY); ctx.stroke();
-    ctx.shadowBlur=0;
     // Bottom fade
     ctx.fillStyle=cachedGrads.slotBot; ctx.fillRect(0,wY+wH*0.62,W,wH*0.38);
     // PICKING text — anchored below slot window
@@ -1175,9 +1168,7 @@ function drawLoop(video,W,H,dpr=1){
       // Raga name
       ctx.font='600 '+bNameFS+'px "Cormorant Garamond",serif';
       ctx.fillStyle='white'; ctx.textAlign='center';
-      ctx.shadowColor='rgba(245,200,66,0.65)'; ctx.shadowBlur=55;
       ctx.fillText(name,W/2,bNameY);
-      ctx.shadowBlur=0;
     }
   }
 

@@ -1748,7 +1748,7 @@ async function shareOrDownload(){
         // Safari/iOS: safe to include text — caption appears below video in WhatsApp
         // Chrome Android: text drops the file attachment, so files-only
         const shareObj={files:[file]};
-        if(nativeMp4) shareObj.text=`I sang ${currentIdx} raga${currentIdx===1?'':'s'} on Raga Rush 🎵 Can you beat me? 👉 https://karnatricks.com/raga-challenge`;
+        if(nativeMp4) shareObj.text=`I sang ${currentIdx} raga${currentIdx===1?'':'s'} on Raga Rush 🎵 Can you beat me? 👉 https://karnatricks.com/raga-rush`;
         await navigator.share(shareObj);
         shared=true;
       }catch(e){
@@ -1902,7 +1902,7 @@ function fbSubmit(){
 }
 
 async function inviteFriend(){
-  const text=`I just sang ${currentIdx} Carnatic raga${currentIdx===1?'':'s'} on Raga Rush 🎵 Think you can beat that? Play it free: https://karnatricks.com/raga-challenge`;
+  const text=`I just sang ${currentIdx} Carnatic raga${currentIdx===1?'':'s'} on Raga Rush 🎵 Think you can beat that? Play it free: https://karnatricks.com/raga-rush`;
   if(navigator.share){
     try{ await navigator.share({title:'Raga Rush',text}); }catch(e){ if(e.name!=='AbortError') console.warn('[invite:share]',e.message); }
   } else {

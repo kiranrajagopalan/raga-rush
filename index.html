@@ -325,7 +325,7 @@ html, body {
   <div id="setup-screen" class="screen active">
     <div class="mandala-bg"></div>
     <div class="setup-scroll">
-      <div class="app-eyebrow">Carnatic</div>
+      <div class="app-eyebrow">Karnatik</div>
       <div class="app-title">Raga<br>Rush</div>
       <div class="app-subtitle">Improvise · Record · Share</div>
       <div class="section-label">Mode</div>
@@ -1902,7 +1902,7 @@ function fbSubmit(){
 }
 
 async function inviteFriend(){
-  const text=`I just sang ${currentIdx} Carnatic raga${currentIdx===1?'':'s'} on Raga Rush 🎵 Think you can beat that? Play it free: https://karnatricks.com/raga-rush`;
+  const text=`I just sang ${currentIdx} Karnatik raga${currentIdx===1?'':'s'} on Raga Rush 🎵 Think you can beat that? Play it free: https://karnatricks.com/raga-rush`;
   if(navigator.share){
     try{ await navigator.share({title:'Raga Rush',text}); }catch(e){ if(e.name!=='AbortError') console.warn('[invite:share]',e.message); }
   } else {

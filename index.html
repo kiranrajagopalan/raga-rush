@@ -514,8 +514,8 @@ function modeLabel(){ return {easy:'Easy',notSoEasy:'Not So Easy',surpriseMe:'Su
 
 // ── Feedback analytics endpoint (optional Google Sheets logger) ──
 // Setup: Extensions → Apps Script → paste doPost handler → Deploy as web app (Anyone) → paste URL here
-const SHEETS_ENDPOINT = 'https://script.google.com/macros/s/AKfycbx6S-nn5jBqF3ZaYACvM-Cq_7fn9WPv7Yhyikph3F_0QhZcp4Q6FHFK6DbGQ47FiGJ1/exec';
-const APP_BUILD = '20260331-b50'; // bump this on every push so Sheets confirms which build you're testing
+const SHEETS_ENDPOINT = 'https://script.google.com/macros/s/AKfycbx1hSMQzOg5m1bd9TWsFUk94nHJDZqadEgM1ytlEy4YTxCCZbiO8hQYApMtz4TgJja5/exec';
+const APP_BUILD = '20260406-b51'; // bump this on every push so Sheets confirms which build you're testing
 const CLOUDINARY_CLOUD = 'dfstch1ag';
 const CLOUDINARY_PRESET = 'forRagaChallange';
 const CLOUDINARY_UPLOAD_URL = 'https://api.cloudinary.com/v1_1/dfstch1ag/video/upload';
@@ -541,6 +541,74 @@ let slotSpinning=false, ragaRevealAt=0, ragaRevealName='';
 let fbReaction=null, fbShared=false;
 let captureTrack=null; // CanvasCaptureMediaStreamTrack for frame-on-demand (Bug 1 fix)
 let cleanupTimer=null; // setTimeout handle for delayed Cloudinary cleanup — must be cancellable
+
+// ── Analytics ──
+const visitorId=(()=>{ let id=localStorage.getItem('rc_visitor'); if(!id){ id='v_'+Date.now().toString(36)+'_'+Math.random().toString(36).slice(2,8); localStorage.setItem('rc_visitor',id); } return id; })();
+let currentStage='setup', stageEnteredAt=Date.now(), pendingEvents=[], processingStartTime=0;
+
+function _detectEnv(){
+  const ua=navigator.userAgent;
+  const isMobile=/Mobi|Android/i.test(ua);
+  const browserName=(()=>{
+    if(/Edg\//.test(ua)) return 'Edge';
+    if(/OPR\/|Opera/.test(ua)) return 'Opera';
+    if(/Chrome\//.test(ua)) return 'Chrome';
+    if(/Safari\//.test(ua)&&!/Chrome/.test(ua)) return 'Safari';
+    if(/Firefox\//.test(ua)) return 'Firefox';
+    return 'Other';
+  })();
+  return {
+    device:isMobile?'mobile':'desktop', browser:browserName,
+    os:navigator.platform||'', language:navigator.language,
+    screen_size:screen.width+'x'+screen.height,
+    timezone:Intl.DateTimeFormat().resolvedOptions().timeZone,
+    connection:navigator.connection?.effectiveType||'',
+  };
+}
+
+function logEvent(payload, immediate){
+  if(!SHEETS_ENDPOINT) return;
+  const evt={
+    ...payload, visitor_id:visitorId, session_id:sessionId,
+    timestamp:new Date().toISOString(), build:APP_BUILD,
+    ..._detectEnv()
+  };
+  if(immediate){
+    try{ fetch(SHEETS_ENDPOINT,{method:'POST',headers:{'Content-Type':'text/plain'},body:JSON.stringify(evt)}); }catch(e){ console.warn('[logEvent]',e.message); }
+  } else {
+    pendingEvents.push(evt);
+    if(pendingEvents.length>=10) flushEvents();
+  }
+}
+
+function flushEvents(){
+  if(!SHEETS_ENDPOINT||!pendingEvents.length) return;
+  const batch=[...pendingEvents]; pendingEvents=[];
+  try{ fetch(SHEETS_ENDPOINT,{method:'POST',headers:{'Content-Type':'text/plain'},body:JSON.stringify({type:'batch',events:batch})}); }catch(e){ console.warn('[flushEvents]',e.message); }
+}
+
+function trackStage(newStage, extra){
+  const now=Date.now();
+  logEvent({
+    type:'funnel', stage:newStage, from_stage:currentStage,
+    stage_time_ms:now-stageEnteredAt,
+    config_mode:modeLabel(), config_time:timePerRaga, config_count:ragaCount,
+    ...extra
+  });
+  currentStage=newStage;
+  stageEnteredAt=now;
+  // Auto-flush on key conversion points
+  if(newStage==='results'||newStage==='shared') flushEvents();
+}
+
+// Flush pending events before page unload
+window.addEventListener('beforeunload',()=>flushEvents());
+
+// ── Visit event (top of funnel) ──
+logEvent({
+  type:'visit', entry_url:location.href, referrer:document.referrer||'',
+  is_returning:sessionPlayCount>0, play_count:sessionPlayCount
+}, true);
 let statusRotationInterval=null; // rotating status words during video processing
 let _wakeLock=null; // Screen Wake Lock — keeps screen on during upload/transcode
 const DRAW_INTERVAL=1000/30; // target 30fps draw rate
@@ -581,9 +649,10 @@ function selectOpt(btn, groupId) {
 async function startCamera(){
   const btn=document.querySelector('#setup-screen > .start-btn');
   btn.textContent='Starting camera…'; btn.disabled=true;
+  trackStage('camera_prompt');
   const tries=[{video:{facingMode:'user'},audio:true},{video:{facingMode:'user'},audio:false},{video:true,audio:false}];
   for(const c of tries){ try{ mediaStream=await navigator.mediaDevices.getUserMedia(c); break; }catch(e){ mediaStream=null; } }
-  if(!mediaStream){ btn.innerHTML='Begin Challenge <i class="ph-bold ph-arrow-right"></i>'; btn.disabled=false; alert('Camera access failed.\n\nPlease:\n• Use Chrome or Safari\n• Allow camera permission\n• Ensure no other app uses camera'); return; }
+  if(!mediaStream){ trackStage('camera_denied'); btn.innerHTML='Begin Challenge <i class="ph-bold ph-arrow-right"></i>'; btn.disabled=false; alert('Camera access failed.\n\nPlease:\n• Use Chrome or Safari\n• Allow camera permission\n• Ensure no other app uses camera'); return; }
 
   // Feed same stream into both preview-video and video-bg
   const previewVideo=document.getElementById('preview-video');
@@ -601,18 +670,21 @@ async function startCamera(){
   document.getElementById('prev-count').textContent=ragaCount+' ragas';
 
   showScreen('preview-screen');
+  trackStage('preview');
   btn.innerHTML='Begin Challenge <i class="ph-bold ph-arrow-right"></i>'; btn.disabled=false;
 }
 
 function goBack(){
   // Stop stream and go back to setup
   if(mediaStream){ mediaStream.getTracks().forEach(t=>t.stop()); mediaStream=null; }
+  trackStage('setup');
   showScreen('setup-screen');
 }
 
 function beginCountdown(){
   const btn=document.getElementById('start-rec-btn');
   btn.disabled=true;
+  trackStage('countdown');
 
   // Switch to camera-screen FIRST so video feed is visible during countdown
   showScreen('camera-screen');
@@ -645,6 +717,7 @@ function beginCountdown(){
         countdownActive=false;
         countdownText='';
         document.getElementById('rec-badge').classList.add('visible');
+        trackStage('recording');
         setupChallenge();
         btn.disabled=false;
       }, 500);
@@ -1219,11 +1292,12 @@ function stopRecording(onStopped){
   setTimeout(_fire, 5000); // force-fire after 5s if onstop never comes
 }
 
-function stopChallenge(){ clearInterval(cdInterval); endChallenge(); }
+function stopChallenge(){ clearInterval(cdInterval); trackStage('early_end'); endChallenge(); }
 
 function endChallenge(){
   if(endCardActive) return;
   clearInterval(cdInterval);
+  if(currentStage!=='early_end') trackStage('challenge_complete');
   challengeElapsed=startTime?Math.round((Date.now()-startTime)/1000):ragaCount*timePerRaga;
   endCardActive=true;
   endCardStart=Date.now();
@@ -1279,6 +1353,7 @@ function showResultsScreen(){
     revealEl.style.display='none';
   }
   showScreen('done-screen');
+  trackStage('results');
   logSession();
   // Show processing overlay or enable download if already ready
   if(mp4Blob){
@@ -1306,36 +1381,17 @@ function showResultsScreen(){
 }
 
 function logSession(){
-  if(!SHEETS_ENDPOINT) return;
-  const ua=navigator.userAgent;
-  const isMobile=/Mobi|Android/i.test(ua);
-  const browserName=(()=>{
-    if(/Edg\//.test(ua)) return 'Edge';
-    if(/OPR\/|Opera/.test(ua)) return 'Opera';
-    if(/Chrome\//.test(ua)) return 'Chrome';
-    if(/Safari\//.test(ua)&&!/Chrome/.test(ua)) return 'Safari';
-    if(/Firefox\//.test(ua)) return 'Firefox';
-    return 'Other';
-  })();
-  try{ fetch(SHEETS_ENDPOINT,{
-    method:'POST',
-    headers:{'Content-Type':'text/plain'},
-    body:JSON.stringify({
-      type:'session', session_id:sessionId,
-      timestamp:new Date().toISOString(),
-      mode:modeLabel(), ragas_completed:currentIdx,
-      ragas_possible:ragaList.length,
-      ragas_list:ragaList.slice(0,currentIdx).join(', '),
-      seconds_per_raga:timePerRaga, time_spent_s:challengeElapsed,
-      theme:activeTheme?.name||'', play_count:sessionPlayCount,
-      device:isMobile?'mobile':'desktop', browser:browserName,
-      os:navigator.platform||'', language:navigator.language,
-      screen_size:screen.width+'x'+screen.height,
-      timezone:Intl.DateTimeFormat().resolvedOptions().timeZone,
-      connection:navigator.connection?.effectiveType||'',
-      build:APP_BUILD,
-    })
-  }); }catch(e){ console.warn('[logSession]',e.message); }
+  processingStartTime=Date.now();
+  logEvent({
+    type:'session', mode:modeLabel(), ragas_completed:currentIdx,
+    ragas_possible:ragaList.length,
+    ragas_list:ragaList.slice(0,currentIdx).join(', '),
+    seconds_per_raga:timePerRaga, time_spent_s:challengeElapsed,
+    theme:activeTheme?.name||'', play_count:sessionPlayCount,
+    completed:currentIdx>=ragaList.length,
+    end_reason:currentIdx>=ragaList.length?'complete':'early_end',
+    referrer:document.referrer||'',
+  }, true);
 }
 
 function enableDownloadButton(){
@@ -1599,6 +1655,7 @@ async function processVideoInBackground(){
   processingStarted=true;
   if(chunks.length===0){
     uploadFailed=true;
+    logEvent({type:'error',error_code:'recording_failed',error_message:'No chunks captured',stage:currentStage},true);
     clearTimeout(processingGuard);
     const btn=document.getElementById('dl-btn');
     if(btn){ btn.classList.remove('processing'); btn.innerHTML='Recording unavailable'; btn.disabled=true; }
@@ -1673,12 +1730,14 @@ async function processVideoInBackground(){
         mp4Blob=await Promise.race([remuxToFlatMp4(fmp4Blob),_timeout]);
       }catch(remuxErr){
         console.warn('[remux] fallback to fMP4:',remuxErr.message,'size:',fmp4Blob.size);
+        logEvent({type:'error',error_code:'remux_failed',error_message:remuxErr.message.slice(0,200),stage:currentStage},true);
         mp4Blob=fmp4Blob; // fMP4 fallback — better than raw WebM
       }
     }
   }catch(e){
     // Upload or fetch failed — no usable video from Cloudinary
     console.warn('[pipeline]',e.message);
+    logEvent({type:'error',error_code:'upload_failed',error_message:e.message.slice(0,200),stage:currentStage},true);
     mp4Blob=null;
     uploadFailed=true;
   }
@@ -1751,18 +1810,25 @@ async function shareOrDownload(){
         if(nativeMp4) shareObj.text=`I sang ${currentIdx} raga${currentIdx===1?'':'s'} on Raga Rush 🎵 Can you beat me? 👉 https://karnatricks.com/raga-rush`;
         await navigator.share(shareObj);
         shared=true;
+        trackStage('shared');
+        logEvent({type:'share',method:'web_share',success:true,video_size_kb:Math.round(blob.size/1024),processing_time_ms:processingStartTime?Date.now()-processingStartTime:0},true);
       }catch(e){
         if(e.name==='AbortError') return;
         console.warn('[share]',e.name,e.message,'size:',blob?.size);
+        logEvent({type:'error',error_code:'share_failed',error_message:(e.name+': '+e.message).slice(0,200),stage:currentStage},true);
       }
     }
 
     if(!shared){
       // Fallback: blob download (append <a> to DOM)
+      let dlMethod='blob_download';
       if(!downloadBlob(blob, filename) && mp4DirectUrl){
         // Fallback 2: direct Cloudinary URL download (skip blob entirely)
         downloadUrl(mp4DirectUrl, filename);
+        dlMethod='url_download';
       }
+      trackStage('shared');
+      logEvent({type:'share',method:dlMethod,success:true,video_size_kb:Math.round(blob.size/1024),processing_time_ms:processingStartTime?Date.now()-processingStartTime:0},true);
     }
 
     if(!fbShared){ fbShared=true; showFeedbackProminent(); }
@@ -1852,45 +1918,14 @@ function fbToggleChip(el){
 function fbSubmit(){
   const chips=[...document.querySelectorAll('#fb-chip-grid .fb-chip.selected')].map(c=>c.dataset.v);
   const text=(document.getElementById('fb-text')?.value||'').trim();
-  const ua=navigator.userAgent;
-  const isMobile=/Mobi|Android/i.test(ua);
-  const browserName=(()=>{
-    if(/Edg\//.test(ua)) return 'Edge';
-    if(/OPR\/|Opera/.test(ua)) return 'Opera';
-    if(/Chrome\//.test(ua)) return 'Chrome';
-    if(/Safari\//.test(ua)&&!/Chrome/.test(ua)) return 'Safari';
-    if(/Firefox\//.test(ua)) return 'Firefox';
-    return 'Other';
-  })();
-  const payload={
-    type:            'feedback',
-    session_id:      sessionId,
-    // Feedback
-    reaction:        fbReaction||'',
-    features:        chips.join(', '),
-    comment:         text,
-    // Session details
-    mode:            modeLabel(),
-    ragas_completed: currentIdx,
-    ragas_possible:  ragaList.length,
-    ragas_list:      ragaList.slice(0,currentIdx).join(', '),
-    seconds_per_raga:timePerRaga,
-    time_spent_s:    challengeElapsed,
-    theme:           activeTheme?.name||'',
-    play_count:      sessionPlayCount,
-    // User context
-    device:          isMobile?'mobile':'desktop',
-    browser:         browserName,
-    os:              navigator.platform||'',
-    language:        navigator.language,
-    screen_size:     screen.width+'x'+screen.height,
-    timezone:        Intl.DateTimeFormat().resolvedOptions().timeZone,
-    connection:      navigator.connection?.effectiveType||'',
-    timestamp:       new Date().toISOString(),
-  };
-  if(SHEETS_ENDPOINT){
-    try{ fetch(SHEETS_ENDPOINT,{method:'POST',body:JSON.stringify(payload),headers:{'Content-Type':'text/plain'}}); }catch(e){ console.warn('[fbSubmit]',e.message); }
-  }
+  trackStage('feedback_given');
+  logEvent({
+    type:'feedback', reaction:fbReaction||'', features:chips.join(', '), comment:text,
+    mode:modeLabel(), ragas_completed:currentIdx, ragas_possible:ragaList.length,
+    ragas_list:ragaList.slice(0,currentIdx).join(', '),
+    seconds_per_raga:timePerRaga, time_spent_s:challengeElapsed,
+    theme:activeTheme?.name||'', play_count:sessionPlayCount,
+  }, true);
   fbSheetClose();
   const strip=document.getElementById('feedback-strip');
   if(!strip) return;
@@ -1903,8 +1938,9 @@ function fbSubmit(){
 
 async function inviteFriend(){
   const text=`I just sang ${currentIdx} Karnatik raga${currentIdx===1?'':'s'} on Raga Rush 🎵 Think you can beat that? Play it free: https://karnatricks.com/raga-rush`;
+  let method='clipboard';
   if(navigator.share){
-    try{ await navigator.share({title:'Raga Rush',text}); }catch(e){ if(e.name!=='AbortError') console.warn('[invite:share]',e.message); }
+    try{ await navigator.share({title:'Raga Rush',text}); method='web_share'; }catch(e){ if(e.name!=='AbortError') console.warn('[invite:share]',e.message); else return; }
   } else {
     try{
       await navigator.clipboard.writeText(text);
@@ -1913,11 +1949,13 @@ async function inviteFriend(){
       const orig=btn.textContent;
       btn.innerHTML='<i class="ph ph-check"></i> Copied!';
       setTimeout(()=>{ btn.textContent=orig; }, 2000);
-    }catch(e){}
+    }catch(e){ return; }
   }
+  logEvent({type:'invite',method},true);
 }
 
 function restart(){
+  trackStage('restarted'); flushEvents();
   clearTimeout(cleanupTimer); cleanupTimer=null; // cancel orphaned cleanup timer from previous play
   stopStatusRotation(); // stop rotating status words if still running
   try{ if(_wakeLock){ _wakeLock.release(); _wakeLock=null; } }catch(e){} // release screen wake lock
@@ -1934,6 +1972,7 @@ function restart(){
   challengeElapsed=0; uploadFailed=false; nativeMp4=false; processingStarted=false;
   endCardActive=false; endCardStart=0;
   fbReaction=null; fbShared=false;
+  currentStage='setup'; stageEnteredAt=Date.now(); // reset analytics stage
   fbSheetClose();
   // Reset feedback strip to ambient
   const strip=document.getElementById('feedback-strip');

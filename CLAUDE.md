@@ -2,11 +2,47 @@
 
 > Current dev state + decisions. For stable architecture see `PROJECT.md`.
 
-## Status: ALL FEATURES COMPLETE
-Build: `20260328-b44` | Branch: `security-fixes` | Video sharing ✅ iOS ✅ Android ✅ Desktop
+## Status: ALL FEATURES COMPLETE + ANALYTICS
+Build: `20260406-b51` | Branch: `main` | Video sharing ✅ iOS ✅ Android ✅ Desktop | Analytics ✅
 
 ## Pending Tasks
-_(none)_
+- Deploy updated Apps Script (`APPS-SCRIPT.js`) to Google Apps Script editor
+- Set up daily summary trigger (time-driven, midnight)
+
+## Analytics Architecture (b51)
+
+### How it works
+- `logEvent(payload, immediate)` — unified analytics function, merges common fields (visitor_id, device, browser, OS, timezone, etc.) automatically
+- `trackStage(newStage)` — tracks funnel transitions with time-in-stage measurement
+- `flushEvents()` — sends batched funnel events (batched for quota protection, flushed on key conversions + beforeunload)
+- `visitorId` — anonymous ID in localStorage (`rc_visitor`), no PII
+
+### Event types
+| Type | Fires at | Immediate? |
+|------|----------|------------|
+| `visit` | Page load | yes |
+| `funnel` | Every stage transition | batched |
+| `session` | Challenge complete | yes |
+| `share` | After share/download | yes |
+| `feedback` | Feedback submit | yes |
+| `invite` | Invite action | yes |
+| `error` | Critical failures | yes |
+
+### Funnel stages (in order)
+`setup` → `camera_prompt` → `preview` → `countdown` → `recording` → `challenge_complete` or `early_end` → `results` → `shared` → `feedback_given` → `restarted`
+
+Also: `camera_denied` (dead end), `setup` (via goBack)
+
+### Google Sheet tabs
+`visits`, `funnel`, `sessions`, `shares`, `feedback`, `invites`, `errors`, `daily_summary`
+
+### Dashboard
+- `dashboard.html` — admin-only via `?admin=1`, fetches cumulative stats from Apps Script `doGet(?action=stats)`
+- Phase 2: subtle community stat on setup screen (deferred until thresholds met)
+
+### Key files
+- `APPS-SCRIPT.js` — paste into Google Apps Script editor, redeploy
+- `dashboard.html` — admin analytics page
 
 ## Critical Decisions (do NOT undo these)
 

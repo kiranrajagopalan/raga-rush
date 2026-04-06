@@ -1,0 +1,174 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>Raga Rush — Analytics</title>
+<link href="https://fonts.googleapis.com/css2?family=Cormorant+Garamond:wght@600;700&family=DM+Sans:wght@400;500;600;700&display=swap" rel="stylesheet">
+<style>
+*{margin:0;padding:0;box-sizing:border-box;}
+body{
+  background:#0d0d0d;color:#e8e8e8;font-family:'DM Sans',sans-serif;
+  padding:48px 20px 80px;max-width:800px;margin:0 auto;
+  -webkit-font-smoothing:antialiased;
+}
+.auth-gate{text-align:center;padding-top:30vh;}
+.auth-gate h1{font-family:'Cormorant Garamond',serif;font-size:28px;color:#F5C842;margin-bottom:12px;}
+.auth-gate p{color:rgba(255,255,255,0.4);font-size:14px;}
+
+h1{font-family:'Cormorant Garamond',serif;font-weight:700;font-size:32px;color:#fff;margin-bottom:4px;}
+.subtitle{font-size:13px;color:rgba(255,255,255,0.35);letter-spacing:1px;text-transform:uppercase;margin-bottom:36px;}
+
+.section-title{
+  font-size:11px;font-weight:600;text-transform:uppercase;letter-spacing:2.5px;
+  color:rgba(245,200,66,0.6);margin:36px 0 16px;
+}
+
+.stats-grid{
+  display:grid;grid-template-columns:repeat(auto-fill,minmax(160px,1fr));gap:12px;
+}
+.stat-card{
+  background:rgba(255,255,255,0.04);border:1px solid rgba(255,255,255,0.08);
+  border-radius:12px;padding:20px 16px;
+}
+.stat-value{font-family:'Cormorant Garamond',serif;font-size:36px;font-weight:700;color:#fff;line-height:1;}
+.stat-value.gold{color:#F5C842;}
+.stat-label{font-size:12px;color:rgba(255,255,255,0.45);margin-top:6px;font-weight:500;}
+
+.raga-list{list-style:none;padding:0;}
+.raga-list li{
+  display:flex;justify-content:space-between;align-items:center;
+  padding:10px 0;border-bottom:1px solid rgba(255,255,255,0.05);
+  font-size:14px;
+}
+.raga-list li:last-child{border-bottom:none;}
+.raga-rank{color:rgba(255,255,255,0.25);font-size:12px;width:24px;flex-shrink:0;}
+.raga-name{flex:1;color:rgba(255,255,255,0.85);}
+.raga-count{
+  color:#F5C842;font-weight:600;font-size:13px;
+  background:rgba(245,200,66,0.08);padding:2px 10px;border-radius:20px;
+}
+
+.funnel{margin-top:8px;}
+.funnel-row{
+  display:flex;align-items:center;gap:12px;margin-bottom:8px;
+}
+.funnel-label{font-size:13px;color:rgba(255,255,255,0.55);width:130px;flex-shrink:0;text-align:right;}
+.funnel-bar-bg{flex:1;height:24px;background:rgba(255,255,255,0.04);border-radius:6px;overflow:hidden;position:relative;}
+.funnel-bar{height:100%;background:linear-gradient(90deg,#F5C842,#e6a817);border-radius:6px;transition:width 0.6s ease;}
+.funnel-pct{position:absolute;right:8px;top:50%;transform:translateY(-50%);font-size:11px;font-weight:600;color:rgba(0,0,0,0.6);}
+.funnel-count{font-size:12px;color:rgba(255,255,255,0.35);width:40px;text-align:right;flex-shrink:0;}
+
+.mode-row{
+  display:flex;gap:8px;margin-top:8px;flex-wrap:wrap;
+}
+.mode-chip{
+  background:rgba(255,255,255,0.06);border:1px solid rgba(255,255,255,0.1);
+  border-radius:20px;padding:6px 14px;font-size:13px;color:rgba(255,255,255,0.7);
+}
+.mode-chip span{color:#F5C842;font-weight:600;margin-left:6px;}
+
+.loading{text-align:center;padding-top:20vh;color:rgba(255,255,255,0.3);font-size:14px;}
+.error-msg{text-align:center;padding-top:20vh;color:rgba(229,57,70,0.7);font-size:14px;}
+
+.refresh-btn{
+  position:fixed;bottom:20px;right:20px;
+  background:rgba(245,200,66,0.1);border:1px solid rgba(245,200,66,0.2);
+  color:#F5C842;font-size:12px;font-weight:600;padding:8px 16px;border-radius:20px;
+  cursor:pointer;font-family:'DM Sans',sans-serif;letter-spacing:0.5px;
+}
+.refresh-btn:hover{background:rgba(245,200,66,0.15);}
+
+.ts{font-size:11px;color:rgba(255,255,255,0.2);text-align:center;margin-top:40px;}
+</style>
+</head>
+<body>
+
+<div id="app"></div>
+
+<script>
+// Config — set your Apps Script endpoint here
+const STATS_ENDPOINT = 'https://script.google.com/macros/s/AKfycbx1hSMQzOg5m1bd9TWsFUk94nHJDZqadEgM1ytlEy4YTxCCZbiO8hQYApMtz4TgJja5/exec';
+
+// Admin gate — only render if ?admin=1
+const isAdmin = new URLSearchParams(location.search).get('admin') === '1';
+
+const app = document.getElementById('app');
+
+if (!isAdmin) {
+  app.innerHTML = `
+    <div class="auth-gate">
+      <h1>Raga Rush</h1>
+      <p>Analytics dashboard is not public yet.</p>
+    </div>`;
+} else {
+  app.innerHTML = '<div class="loading">Loading analytics\u2026</div>';
+  loadDashboard();
+}
+
+async function loadDashboard() {
+  try {
+    const resp = await fetch(STATS_ENDPOINT + '?action=stats');
+    if (!resp.ok) throw new Error('HTTP ' + resp.status);
+    const stats = await resp.json();
+    renderDashboard(stats);
+  } catch (e) {
+    app.innerHTML = '<div class="error-msg">Failed to load analytics: ' + e.message + '</div>';
+  }
+}
+
+function renderDashboard(s) {
+  const topRagas = (s.top_ragas || []);
+  const modes = s.modes || {};
+  const modeChips = Object.entries(modes).map(([m, c]) =>
+    '<div class="mode-chip">' + m + '<span>' + c + '</span></div>'
+  ).join('');
+  const ragaRows = topRagas.map(([name, count], i) =>
+    '<li><span class="raga-rank">' + (i + 1) + '.</span><span class="raga-name">' + name + '</span><span class="raga-count">' + count + '</span></li>'
+  ).join('');
+
+  app.innerHTML = `
+    <h1>Raga Rush Analytics</h1>
+    <div class="subtitle">Admin Dashboard</div>
+
+    <div class="section-title">Overview</div>
+    <div class="stats-grid">
+      <div class="stat-card">
+        <div class="stat-value gold">${(s.total_ragas || 0).toLocaleString()}</div>
+        <div class="stat-label">Total ragas sung</div>
+      </div>
+      <div class="stat-card">
+        <div class="stat-value">${(s.total_sessions || 0).toLocaleString()}</div>
+        <div class="stat-label">Challenges completed</div>
+      </div>
+      <div class="stat-card">
+        <div class="stat-value">${(s.total_visits || 0).toLocaleString()}</div>
+        <div class="stat-label">Total visits</div>
+      </div>
+      <div class="stat-card">
+        <div class="stat-value">${s.timezones || 0}</div>
+        <div class="stat-label">Timezones</div>
+      </div>
+    </div>
+
+    <div class="section-title">Top Raga</div>
+    <div class="stats-grid">
+      <div class="stat-card" style="grid-column:span 2;">
+        <div class="stat-value gold">${s.top_raga || '\u2014'}</div>
+        <div class="stat-label">${s.top_raga ? 'Sung ' + s.top_raga_count + ' times' : 'No data yet'}</div>
+      </div>
+    </div>
+
+    <div class="section-title">Mode Distribution</div>
+    <div class="mode-row">${modeChips || '<span style="color:rgba(255,255,255,0.3);font-size:13px;">No data yet</span>'}</div>
+
+    <div class="section-title">Top 10 Ragas</div>
+    <ul class="raga-list">${ragaRows || '<li style="color:rgba(255,255,255,0.3);">No data yet</li>'}</ul>
+
+    <button class="refresh-btn" onclick="location.reload()">Refresh</button>
+    <div class="ts">Last loaded: ${new Date().toLocaleString()}</div>
+  `;
+}
+</script>
+</body>
+</html>

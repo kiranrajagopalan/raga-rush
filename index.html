@@ -1428,7 +1428,7 @@ function showResultsScreen(){
   }
   showScreen('done-screen');
   trackStage('results');
-  logSession();
+  // logSession() moved to end of processVideoInBackground() — needs pipelineUsed
   // Show processing overlay or enable download if already ready
   if(mp4Blob){
     enableDownloadButton();
@@ -1455,7 +1455,6 @@ function showResultsScreen(){
 }
 
 function logSession(){
-  processingStartTime=Date.now();
   logEvent({
     type:'session', mode:modeLabel(), ragas_completed:currentIdx,
     ragas_possible:ragaList.length,
@@ -1465,6 +1464,9 @@ function logSession(){
     completed:currentIdx>=ragaList.length,
     end_reason:currentIdx>=ragaList.length?'complete':'early_end',
     referrer:document.referrer||'',
+    pipeline:pipelineUsed,
+    video_size_kb:mp4Blob?Math.round(mp4Blob.size/1024):'',
+    processing_time_ms:processingStartTime?Date.now()-processingStartTime:0,
   }, true);
 }
 
@@ -1771,6 +1773,7 @@ function remuxToFlatMp4(fmp4Blob){
 async function processVideoInBackground(){
   if(processingStarted) return;
   processingStarted=true;
+  processingStartTime=Date.now();
   if(chunks.length===0){
     uploadFailed=true;
     logEvent({type:'error',error_code:'recording_failed',error_message:'No chunks captured',stage:currentStage},true);
@@ -1920,6 +1923,7 @@ async function processVideoInBackground(){
   try{ if(_wakeLock){ _wakeLock.release(); _wakeLock=null; } }catch(e){}
 
   clearTimeout(processingGuard);
+  logSession(); // Log session with pipeline data now that processing is complete
   if(isOnDone()) enableDownloadButton();
 }
 
@@ -1984,7 +1988,6 @@ async function shareOrDownload(){
         await navigator.share(shareObj);
         shared=true;
         trackStage('shared');
-        logEvent({type:'session',share_method:'web_share',pipeline:pipelineUsed,video_size_kb:Math.round(blob.size/1024),processing_time_ms:processingStartTime?Date.now()-processingStartTime:0},true);
       }catch(e){
         if(e.name==='AbortError') return;
         console.warn('[share]',e.name,e.message,'size:',blob?.size);
@@ -2001,7 +2004,6 @@ async function shareOrDownload(){
         dlMethod='url_download';
       }
       trackStage('shared');
-      logEvent({type:'session',share_method:dlMethod,pipeline:pipelineUsed,video_size_kb:Math.round(blob.size/1024),processing_time_ms:processingStartTime?Date.now()-processingStartTime:0},true);
     }
 
     if(!fbShared){ fbShared=true; showFeedbackProminent(); }

@@ -48,7 +48,7 @@ function routeEvent(data) {
     },
     'session': {
       tab: 'sessions',
-      cols: ['timestamp','visitor_id','session_id','mode','ragas_completed','ragas_possible','ragas_list','seconds_per_raga','time_spent_s','theme','play_count','completed','end_reason','referrer','device','browser','os','language','screen_size','timezone','connection','build','pipeline','share_method','video_size_kb','processing_time_ms']
+      cols: ['timestamp','visitor_id','session_id','mode','ragas_completed','ragas_possible','ragas_list','seconds_per_raga','time_spent_s','theme','play_count','completed','end_reason','referrer','device','browser','os','language','screen_size','timezone','connection','build','pipeline','video_size_kb','processing_time_ms']
     },
     'feedback': {
       tab: 'feedback',

@@ -106,6 +106,13 @@ if (!isAdmin) {
   loadDashboard();
 }
 
+// Escape HTML to prevent XSS from server-controlled data
+function esc(s) {
+  const d = document.createElement('div');
+  d.textContent = String(s || '');
+  return d.innerHTML;
+}
+
 async function loadDashboard() {
   try {
     const resp = await fetch(STATS_ENDPOINT + '?action=stats');
@@ -113,7 +120,7 @@ async function loadDashboard() {
     const stats = await resp.json();
     renderDashboard(stats);
   } catch (e) {
-    app.innerHTML = '<div class="error-msg">Failed to load analytics: ' + e.message + '</div>';
+    app.innerHTML = '<div class="error-msg">Failed to load analytics: ' + esc(e.message) + '</div>';
   }
 }
 
@@ -121,10 +128,10 @@ function renderDashboard(s) {
   const topRagas = (s.top_ragas || []);
   const modes = s.modes || {};
   const modeChips = Object.entries(modes).map(([m, c]) =>
-    '<div class="mode-chip">' + m + '<span>' + c + '</span></div>'
+    '<div class="mode-chip">' + esc(m) + '<span>' + esc(c) + '</span></div>'
   ).join('');
   const ragaRows = topRagas.map(([name, count], i) =>
-    '<li><span class="raga-rank">' + (i + 1) + '.</span><span class="raga-name">' + name + '</span><span class="raga-count">' + count + '</span></li>'
+    '<li><span class="raga-rank">' + (i + 1) + '.</span><span class="raga-name">' + esc(name) + '</span><span class="raga-count">' + esc(count) + '</span></li>'
   ).join('');
 
   app.innerHTML = `
@@ -154,8 +161,8 @@ function renderDashboard(s) {
     <div class="section-title">Top Raga</div>
     <div class="stats-grid">
       <div class="stat-card" style="grid-column:span 2;">
-        <div class="stat-value gold">${s.top_raga || '\u2014'}</div>
-        <div class="stat-label">${s.top_raga ? 'Sung ' + s.top_raga_count + ' times' : 'No data yet'}</div>
+        <div class="stat-value gold">${esc(s.top_raga) || '\u2014'}</div>
+        <div class="stat-label">${s.top_raga ? 'Sung ' + esc(s.top_raga_count) + ' times' : 'No data yet'}</div>
       </div>
     </div>
 

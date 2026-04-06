@@ -2,12 +2,18 @@
 
 > Current dev state + decisions. For stable architecture see `PROJECT.md`.
 
-## Status: ALL FEATURES COMPLETE + ANALYTICS
-Build: `20260406-b51` | Branch: `main` | Video sharing ✅ iOS ✅ Android ✅ Desktop | Analytics ✅
+## Status: ALL FEATURES COMPLETE + ANALYTICS + PRIVACY
+Build: `20260406-b52` | Branch: `main` | Video sharing ✅ iOS ✅ Android ✅ Desktop | Analytics ✅ | Privacy ✅ | HTTPS ✅
 
 ## Pending Tasks
-- Deploy updated Apps Script (`APPS-SCRIPT.js`) to Google Apps Script editor
-- Set up daily summary trigger (time-driven, midnight)
+_(none)_
+
+## Recent Changes (b51–b52)
+- b51: Full analytics system (logEvent, trackStage, funnel tracking, visitor_id, dashboard)
+- b51: Updated Apps Script endpoint (new deployment URL)
+- b52: HTTPS client-side redirect (excludes localhost)
+- b52: Privacy disclaimer — subtle line above CTA + bottom sheet with privacy policy
+- b52: Fix — restored Begin Challenge button as direct child of #setup-screen (wrapper div broke `>` selector)
 
 ## Analytics Architecture (b51)
 
@@ -37,7 +43,7 @@ Also: `camera_denied` (dead end), `setup` (via goBack)
 `visits`, `funnel`, `sessions`, `shares`, `feedback`, `invites`, `errors`, `daily_summary`
 
 ### Dashboard
-- `dashboard.html` — admin-only via `?admin=1`, fetches cumulative stats from Apps Script `doGet(?action=stats)`
+- `dashboard.html` — admin-only via `?admin=7`, fetches cumulative stats from Apps Script `doGet(?action=stats)`
 - Phase 2: subtle community stat on setup screen (deferred until thresholds met)
 
 ### Key files

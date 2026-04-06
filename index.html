@@ -384,8 +384,8 @@ html, body {
       </div>
       <div class="section-label count-section">Number of Ragas</div>
       <div class="option-group count-section" id="count-group">
-        <button class="opt-btn" data-key="ragaCount" data-val="5" onclick="selectOpt(this,'count-group')">5</button>
-        <button class="opt-btn selected" data-key="ragaCount" data-val="10" onclick="selectOpt(this,'count-group')">10</button>
+        <button class="opt-btn selected" data-key="ragaCount" data-val="5" onclick="selectOpt(this,'count-group')">5</button>
+        <button class="opt-btn" data-key="ragaCount" data-val="10" onclick="selectOpt(this,'count-group')">10</button>
       </div>
     </div>
     <div class="privacy-line" onclick="privacyOpen()">Your video stays on your device · <a>Privacy</a></div>
@@ -585,7 +585,7 @@ const CLOUDINARY_CLOUD = 'dfstch1ag';
 const CLOUDINARY_PRESET = 'forRagaChallange';
 const CLOUDINARY_UPLOAD_URL = 'https://api.cloudinary.com/v1_1/dfstch1ag/video/upload';
 
-let difficulty='easy', timePerRaga=8, ragaCount=10;
+let difficulty='easy', timePerRaga=8, ragaCount=5;
 let lastSurpriseThemeIdx=-1, activeTheme=null;
 let currentIdx=0, ragaList=[], cdInterval=null, secondsLeft=0;
 let mediaStream=null, mediaRecorder=null, chunks=[];

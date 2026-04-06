@@ -2,6 +2,7 @@
 <html lang="en">
 <head>
 <meta charset="UTF-8">
+<script>if(location.protocol==='http:'&&location.hostname!=='localhost'&&location.hostname!=='127.0.0.1')location.replace(location.href.replace('http:','https:'));</script>
 <meta http-equiv="Cache-Control" content="no-cache, no-store, must-revalidate">
 <meta http-equiv="Pragma" content="no-cache">
 <meta http-equiv="Expires" content="0">
@@ -316,6 +317,47 @@ html, body {
   cursor:pointer; font-family:var(--font); text-align:center; width:100%;
   padding:0; transition:color 0.2s; }
 .fb-sheet-skip:hover { color:rgba(255,255,255,0.5); }
+
+/* ── PRIVACY ── */
+.privacy-line {
+  font-size:11px; color:rgba(255,255,255,0.25); text-align:center;
+  letter-spacing:0.3px; margin-bottom:12px; cursor:pointer;
+  transition:color 0.2s; }
+.privacy-line:hover { color:rgba(255,255,255,0.4); }
+.privacy-line a { color:rgba(245,200,66,0.45); text-decoration:none; cursor:pointer; transition:color 0.2s; }
+.privacy-line:hover a { color:rgba(245,200,66,0.65); }
+#privacy-backdrop {
+  display:none; position:fixed; inset:0; background:rgba(0,0,0,0.55);
+  z-index:200; backdrop-filter:blur(2px); -webkit-backdrop-filter:blur(2px); }
+#privacy-backdrop.open { display:block; }
+#privacy-sheet {
+  position:fixed; bottom:0; left:50%;
+  transform:translateX(-50%) translateY(100%);
+  width:100%; max-width:430px;
+  background:#111; border-radius:20px 20px 0 0;
+  padding:16px 24px 36px; z-index:201;
+  transition:transform 0.35s cubic-bezier(0.32,0.72,0,1);
+  display:flex; flex-direction:column; gap:16px; box-sizing:border-box;
+  max-height:85%; overflow-y:auto; }
+#privacy-sheet.open { transform:translateX(-50%) translateY(0); }
+.privacy-handle { width:36px; height:4px; border-radius:2px; background:rgba(255,255,255,0.18); margin:0 auto; flex-shrink:0; }
+.privacy-title { font-family:var(--font); font-size:18px; font-weight:600; color:rgba(255,255,255,0.9); margin:0; line-height:1.3; }
+.privacy-section-label { font-size:10px; letter-spacing:2.5px; text-transform:uppercase; color:var(--gold); font-weight:600; margin-bottom:-8px; opacity:0.7; }
+.privacy-checks { list-style:none; padding:0; margin:0; display:flex; flex-direction:column; gap:10px; }
+.privacy-checks li {
+  display:flex; align-items:flex-start; gap:10px;
+  font-size:13px; color:rgba(255,255,255,0.55); line-height:1.5; }
+.privacy-checks li::before {
+  content:''; flex-shrink:0; width:16px; height:16px; margin-top:2px;
+  background-image:url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' width='16' height='16' viewBox='0 0 16 16'%3E%3Ccircle cx='8' cy='8' r='7' fill='none' stroke='rgba(245,200,66,0.4)' stroke-width='1'/%3E%3Cpath d='M5 8.2l2 2 4-4.5' fill='none' stroke='rgba(245,200,66,0.7)' stroke-width='1.3' stroke-linecap='round' stroke-linejoin='round'/%3E%3C/svg%3E");
+  background-size:contain; background-repeat:no-repeat; }
+.privacy-divider { width:100%; height:1px; background:rgba(255,255,255,0.06); margin:4px 0; }
+.privacy-note { font-size:11px; color:rgba(255,255,255,0.2); line-height:1.6; letter-spacing:0.2px; }
+.privacy-dismiss {
+  width:100%; padding:15px; background:var(--gold); color:#000; border:none;
+  border-radius:14px; font-family:var(--font); font-size:16px; font-weight:700;
+  cursor:pointer; transition:opacity 0.15s, transform 0.15s; flex-shrink:0; }
+.privacy-dismiss:active { transform:scale(0.98); }
 </style>
 </head>
 <body>
@@ -346,7 +388,10 @@ html, body {
         <button class="opt-btn selected" data-key="ragaCount" data-val="10" onclick="selectOpt(this,'count-group')">10</button>
       </div>
     </div>
-    <button class="start-btn" onclick="startCamera()">Begin Challenge <i class="ph-bold ph-arrow-right"></i></button>
+    <div style="width:calc(100% - 16%);margin:0 8% 4%;flex-shrink:0;display:flex;flex-direction:column;align-items:center;position:relative;z-index:2;">
+      <div class="privacy-line" onclick="privacyOpen()">Your video stays on your device · <a>Privacy</a></div>
+      <button class="start-btn" style="width:100%;margin:0;" onclick="startCamera()">Begin Challenge <i class="ph-bold ph-arrow-right"></i></button>
+    </div>
   </div>
 
   <!-- PREVIEW — mirrors challenge layout so user sees exact framing -->
@@ -478,6 +523,28 @@ html, body {
     <textarea id="fb-text" placeholder="Anything else on your mind?"></textarea>
     <button id="fb-send-btn" onclick="fbSubmit()">Send feedback</button>
     <button class="fb-sheet-skip" onclick="fbSheetSkip()">Skip →</button>
+  </div>
+
+  <!-- PRIVACY BOTTOM SHEET -->
+  <div id="privacy-backdrop" onclick="privacyClose()"></div>
+  <div id="privacy-sheet">
+    <div class="privacy-handle"></div>
+    <div class="privacy-title">Your Privacy</div>
+    <div class="privacy-section-label">Your Video</div>
+    <ul class="privacy-checks">
+      <li>Recorded and processed entirely on your device</li>
+      <li>No video or audio is permanently stored on any server</li>
+      <li>The final video exists only on your device until you choose to share it</li>
+    </ul>
+    <div class="privacy-divider"></div>
+    <div class="privacy-section-label">Analytics</div>
+    <ul class="privacy-checks">
+      <li>No cookies are used</li>
+      <li>No personal information is collected or shared with third parties</li>
+    </ul>
+    <div class="privacy-divider"></div>
+    <div class="privacy-note">Raga Rush does not require an account, does not store personal data, and does not use cookies. You can clear your browser data at any time to remove all locally stored information.</div>
+    <button class="privacy-dismiss" onclick="privacyClose()">Got it</button>
   </div>
 
   <!-- 3-2-1 COUNTDOWN (overlays any screen) -->
@@ -1909,6 +1976,15 @@ function fbSheetClose(){
 function fbSheetSkip(){
   fbSheetClose();
   fbReaction=null; // allow re-tap
+}
+
+function privacyOpen(){
+  document.getElementById('privacy-backdrop').classList.add('open');
+  document.getElementById('privacy-sheet').classList.add('open');
+}
+function privacyClose(){
+  document.getElementById('privacy-backdrop').classList.remove('open');
+  document.getElementById('privacy-sheet').classList.remove('open');
 }
 
 function fbToggleChip(el){

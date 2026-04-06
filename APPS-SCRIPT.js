@@ -15,7 +15,7 @@
 //    - Event source: Time-driven → Day timer → Midnight to 1am
 //
 // TABS (auto-created on first event of each type):
-//   visits, funnel, sessions, shares, feedback, invites, errors, daily_summary
+//   visits, funnel, sessions, feedback, invites, errors, daily_summary
 // ══════════════════════════════════════════════════════════════
 
 function doPost(e) {
@@ -48,11 +48,7 @@ function routeEvent(data) {
     },
     'session': {
       tab: 'sessions',
-      cols: ['timestamp','visitor_id','session_id','mode','ragas_completed','ragas_possible','ragas_list','seconds_per_raga','time_spent_s','theme','play_count','completed','end_reason','referrer','device','browser','os','language','screen_size','timezone','connection','build']
-    },
-    'share': {
-      tab: 'shares',
-      cols: ['timestamp','visitor_id','session_id','method','success','video_size_kb','processing_time_ms','device','browser','os','build']
+      cols: ['timestamp','visitor_id','session_id','mode','ragas_completed','ragas_possible','ragas_list','seconds_per_raga','time_spent_s','theme','play_count','completed','end_reason','referrer','device','browser','os','language','screen_size','timezone','connection','build','pipeline','share_method','video_size_kb','processing_time_ms']
     },
     'feedback': {
       tab: 'feedback',
@@ -126,7 +122,6 @@ function computeDailySummary() {
   const visits = getRowsForDate('visits');
   const funnel = getRowsForDate('funnel');
   const sessions = getRowsForDate('sessions');
-  const shares = getRowsForDate('shares');
   const feedback = getRowsForDate('feedback');
   const invites = getRowsForDate('invites');
   const errors = getRowsForDate('errors');
@@ -197,7 +192,7 @@ function computeDailySummary() {
     totalRagasSung,
     topRaga ? topRaga + ' (' + topRagaCount + ')' : '',
     topMode || '',
-    shares.length,
+    funnelStages['shared'] || 0,
     invites.length,
     feedback.length,
     avgSetupTimeMs,

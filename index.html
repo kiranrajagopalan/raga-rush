@@ -597,7 +597,7 @@ let recCanvas=null, recCtx=null, drawRunning=false;
 let finalBlob=null;
 let _cdDeleteToken = null; // Cloudinary delete token for cleanup after share/download
 let countdownActive=false, countdownText='';
-let challengeElapsed=0, mp4Blob=null, mp4DirectUrl=null, uploadFailed=false, nativeMp4=false;
+let challengeElapsed=0, mp4Blob=null, mp4DirectUrl=null, uploadFailed=false, nativeMp4=false, pipelineUsed='unknown';
 let processingGuard=null; // safety timer — rescues "Preparing…" if all else fails
 let processingStarted=false; // once-gate — prevents concurrent invocations of processVideoInBackground
 let captureHeartbeat=null; // setInterval handle — keeps H264 encoder fed on Android Chrome
@@ -1807,6 +1807,7 @@ async function processVideoInBackground(){
         console.log('[local] Safari: using raw recording directly');
         setConvPct(90);
         mp4Blob=finalBlob;
+        pipelineUsed='local_safari';
       } else {
         // Chrome: transcode WebM (VP9+Opus) → MP4 (H264+AAC) via Mediabunny + WebCodecs
         console.log('[local] Chrome: transcoding WebM→MP4 via Mediabunny');
@@ -1814,6 +1815,7 @@ async function processVideoInBackground(){
         try{
           mp4Blob=await transcodeLocally(finalBlob, (p)=>setConvPct(5+Math.round(p*85)));
           console.log('[local] transcode done, size:',mp4Blob.size);
+          pipelineUsed='local_chrome';
         }catch(localErr){
           // Mediabunny failed — fall back to Cloudinary
           console.warn('[local] transcode failed, falling back to Cloudinary:',localErr.message);
@@ -1823,6 +1825,7 @@ async function processVideoInBackground(){
         // Cloudinary fallback if local transcode failed
         if(!mp4Blob){
           console.log('[local] falling back to Cloudinary pipeline');
+          pipelineUsed='local_fallback';
           const uploadTimeout=Math.max(120000, Math.round(challengeElapsed*2000));
           const fetchTimeout =Math.max(120000, Math.round(challengeElapsed*2000));
           setConvPct(5);
@@ -1870,6 +1873,7 @@ async function processVideoInBackground(){
         const _ab=await resp.arrayBuffer();
         mp4Blob=new Blob([_ab],{type:'video/mp4'});
         clearTimeout(fetchTimer);
+        pipelineUsed='cloudinary_safari';
       } else {
         // ── Path B: Android/Desktop → Cloudinary + client-side remux ──
         setConvPct(5);
@@ -1894,10 +1898,12 @@ async function processVideoInBackground(){
         try{
           const _timeout=new Promise((_,r)=>setTimeout(()=>r(new Error('remux timeout')),remuxTimeout));
           mp4Blob=await Promise.race([remuxToFlatMp4(fmp4Blob),_timeout]);
+          pipelineUsed='cloudinary_chrome';
         }catch(remuxErr){
           console.warn('[remux] fallback to fMP4:',remuxErr.message,'size:',fmp4Blob.size);
           logEvent({type:'error',error_code:'remux_failed',error_message:remuxErr.message.slice(0,200),stage:currentStage},true);
           mp4Blob=fmp4Blob; // fMP4 fallback — better than raw WebM
+          pipelineUsed='cloudinary_fmp4';
         }
       }
     }
@@ -1978,7 +1984,7 @@ async function shareOrDownload(){
         await navigator.share(shareObj);
         shared=true;
         trackStage('shared');
-        logEvent({type:'share',method:'web_share',success:true,video_size_kb:Math.round(blob.size/1024),processing_time_ms:processingStartTime?Date.now()-processingStartTime:0},true);
+        logEvent({type:'session',share_method:'web_share',pipeline:pipelineUsed,video_size_kb:Math.round(blob.size/1024),processing_time_ms:processingStartTime?Date.now()-processingStartTime:0},true);
       }catch(e){
         if(e.name==='AbortError') return;
         console.warn('[share]',e.name,e.message,'size:',blob?.size);
@@ -1995,7 +2001,7 @@ async function shareOrDownload(){
         dlMethod='url_download';
       }
       trackStage('shared');
-      logEvent({type:'share',method:dlMethod,success:true,video_size_kb:Math.round(blob.size/1024),processing_time_ms:processingStartTime?Date.now()-processingStartTime:0},true);
+      logEvent({type:'session',share_method:dlMethod,pipeline:pipelineUsed,video_size_kb:Math.round(blob.size/1024),processing_time_ms:processingStartTime?Date.now()-processingStartTime:0},true);
     }
 
     if(!fbShared){ fbShared=true; showFeedbackProminent(); }

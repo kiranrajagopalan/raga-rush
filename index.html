@@ -693,7 +693,15 @@ const DONE_TITLES=[
   'Hamsa\u2011down, you won!',
 ];
 
-window.addEventListener('beforeunload',()=>{ if(mediaStream) mediaStream.getTracks().forEach(t=>t.stop()); });
+window.addEventListener('beforeunload',()=>{
+  if(mediaStream) mediaStream.getTracks().forEach(t=>t.stop());
+  // Clean up Cloudinary file on tab close — sendBeacon survives page unload unlike fetch
+  if(_cdDeleteToken){
+    navigator.sendBeacon('https://api.cloudinary.com/v1_1/'+CLOUDINARY_CLOUD+'/delete_by_token',
+      new Blob([JSON.stringify({token:_cdDeleteToken})],{type:'application/json'}));
+    _cdDeleteToken=null;
+  }
+});
 
 const CIRC = 2*Math.PI*44;
 document.getElementById('ring-progress').style.strokeDasharray = CIRC;

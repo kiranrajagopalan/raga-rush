@@ -83,10 +83,16 @@ function getOrCreateTab(name, headers) {
   if (!sheet) {
     sheet = ss.insertSheet(name);
     sheet.appendRow(headers);
-    // Bold header row
     sheet.getRange(1, 1, 1, headers.length).setFontWeight('bold');
-    // Freeze header
     sheet.setFrozenRows(1);
+  } else {
+    // Auto-extend headers when new columns are added to TAB_CONFIG
+    const existingHeaders = sheet.getRange(1, 1, 1, sheet.getLastColumn()).getValues()[0];
+    if (existingHeaders.length < headers.length) {
+      const newCols = headers.slice(existingHeaders.length);
+      const startCol = existingHeaders.length + 1;
+      sheet.getRange(1, startCol, 1, newCols.length).setValues([newCols]).setFontWeight('bold');
+    }
   }
   return sheet;
 }

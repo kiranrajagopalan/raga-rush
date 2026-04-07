@@ -1491,40 +1491,26 @@ function enableDownloadButton(){
 // ── Local pipeline (client-side transcode, no Cloudinary) ──
 // Gated behind ?local URL param. Safari: share raw fMP4 directly. Chrome: Mediabunny transcode.
 
-let _mediabunnyLoaded=false;
-function loadMediabunny(){
-  if(_mediabunnyLoaded) return Promise.resolve();
-  return new Promise((resolve,reject)=>{
-    const s1=document.createElement('script');
-    s1.src='https://cdn.jsdelivr.net/npm/mediabunny@1.40.1/dist/bundles/mediabunny.min.cjs';
-    s1.onload=()=>{
-      const s2=document.createElement('script');
-      s2.src='https://cdn.jsdelivr.net/npm/@mediabunny/aac-encoder@1.40.1/dist/bundles/mediabunny-aac-encoder.min.js';
-      s2.onload=()=>{
-        // Register AAC polyfill for browsers without native AAC encoding
-        if(typeof MediabunnyAacEncoder!=='undefined' && MediabunnyAacEncoder.registerAacEncoder){
-          MediabunnyAacEncoder.registerAacEncoder();
-        }
-        _mediabunnyLoaded=true;
-        resolve();
-      };
-      s2.onerror=()=>reject(new Error('Failed to load AAC encoder'));
-      document.head.appendChild(s2);
-    };
-    s1.onerror=()=>reject(new Error('Failed to load Mediabunny'));
-    document.head.appendChild(s1);
-  });
+let _mbModule=null; // cached Mediabunny ES module
+async function loadMediabunny(){
+  if(_mbModule) return _mbModule;
+  // Dynamic import — .mjs works in all modern browsers, .cjs does NOT (CommonJS)
+  _mbModule=await import('https://cdn.jsdelivr.net/npm/mediabunny@1.40.1/dist/bundles/mediabunny.min.mjs');
+  try{
+    const aac=await import('https://cdn.jsdelivr.net/npm/@mediabunny/aac-encoder@1.40.1/dist/bundles/mediabunny-aac-encoder.min.mjs');
+    if(aac.registerAacEncoder) aac.registerAacEncoder();
+  }catch(e){ console.warn('[mediabunny] AAC polyfill failed, native AAC only:',e.message); }
+  return _mbModule;
 }
 
 async function transcodeLocally(webmBlob, onProgress){
-  await loadMediabunny();
-  const MB=Mediabunny;
+  const MB=await loadMediabunny();
   const input=new MB.Input({source: new MB.BlobSource(webmBlob), formats: MB.ALL_FORMATS});
   const target=new MB.BufferTarget();
   const output=new MB.Output({format: new MB.Mp4OutputFormat(), target: target});
   const conversion=await MB.Conversion.init({
     input, output,
-    video:{codec:'h264', bitrate:4000000},
+    video:{codec:'avc', bitrate:4000000},
     audio:{codec:'aac', bitrate:128000}
   });
   if(onProgress) conversion.onProgress=onProgress;

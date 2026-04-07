@@ -290,15 +290,6 @@ html, body {
 .fb-sheet-title {
   font-family:var(--font); font-size:17px; font-weight:600;
   color:rgba(255,255,255,0.9); margin:0; line-height:1.3; }
-.fb-chip-grid {
-  display:grid; grid-template-columns:1fr 1fr; gap:10px; }
-.fb-chip {
-  padding:14px 10px; border:1px solid rgba(245,200,66,0.28); border-radius:12px;
-  background:transparent; color:rgba(255,255,255,0.6); font-size:13px;
-  font-family:var(--font); cursor:pointer; text-align:center;
-  transition:background 0.15s, border-color 0.15s, color 0.15s; line-height:1.35; }
-.fb-chip.selected {
-  background:rgba(245,200,66,0.15); border-color:var(--gold); color:var(--gold); }
 #fb-text {
   width:100%; background:rgba(255,255,255,0.05); border:1px solid rgba(255,255,255,0.1);
   border-radius:12px; padding:14px; font-family:var(--font); font-size:14px;
@@ -511,14 +502,8 @@ html, body {
   <div id="fb-sheet-backdrop" onclick="fbSheetClose()"></div>
   <div id="fb-sheet">
     <div class="fb-sheet-handle"></div>
-    <p class="fb-sheet-title">What would you love to see next?</p>
-    <div class="fb-chip-grid" id="fb-chip-grid">
-      <button class="fb-chip" data-v="multiplayer" onclick="fbToggleChip(this)">Multiplayer</button>
-      <button class="fb-chip" data-v="more-ragas" onclick="fbToggleChip(this)">More ragas</button>
-      <button class="fb-chip" data-v="practice" onclick="fbToggleChip(this)">Practice mode</button>
-      <button class="fb-chip" data-v="aaroha" onclick="fbToggleChip(this)">Aaroha / Avaroha</button>
-    </div>
-    <textarea id="fb-text" placeholder="Anything else on your mind?"></textarea>
+    <p class="fb-sheet-title">Any thoughts?</p>
+    <textarea id="fb-text" placeholder="Tell us what you think…"></textarea>
     <button id="fb-send-btn" onclick="fbSubmit()">Send feedback</button>
     <button class="fb-sheet-skip" onclick="fbSheetSkip()">Skip →</button>
   </div>
@@ -580,7 +565,7 @@ function modeLabel(){ return {easy:'Easy',notSoEasy:'Not So Easy',surpriseMe:'Su
 // ── Feedback analytics endpoint (optional Google Sheets logger) ──
 // Setup: Extensions → Apps Script → paste doPost handler → Deploy as web app (Anyone) → paste URL here
 const SHEETS_ENDPOINT = 'https://script.google.com/macros/s/AKfycbxSjYYT7WnYYm5OII1UdeRjMAfArp8MDVJJ_DU6vSW_t5_80LfY7syyezI4iNxoV17b/exec';
-const APP_BUILD = '20260407-b55'; // bump this on every push so Sheets confirms which build you're testing
+const APP_BUILD = '20260407-b56'; // bump this on every push so Sheets confirms which build you're testing
 const CLOUDINARY_CLOUD = 'dfstch1ag';
 const CLOUDINARY_PRESET = 'forRagaChallange';
 const CLOUDINARY_UPLOAD_URL = 'https://api.cloudinary.com/v1_1/dfstch1ag/video/upload';
@@ -2056,7 +2041,6 @@ function fbReact(v){
 }
 
 function fbSheetOpen(){
-  document.querySelectorAll('#fb-chip-grid .fb-chip').forEach(c=>c.classList.remove('selected'));
   document.getElementById('fb-text').value='';
   document.getElementById('fb-sheet-backdrop').classList.add('open');
   document.getElementById('fb-sheet').classList.add('open');
@@ -2081,16 +2065,11 @@ function privacyClose(){
   document.getElementById('privacy-sheet').classList.remove('open');
 }
 
-function fbToggleChip(el){
-  el.classList.toggle('selected');
-}
-
 function fbSubmit(){
-  const chips=[...document.querySelectorAll('#fb-chip-grid .fb-chip.selected')].map(c=>c.dataset.v);
   const text=(document.getElementById('fb-text')?.value||'').trim();
   trackStage('feedback_given');
   logEvent({
-    type:'feedback', reaction:fbReaction||'', features:chips.join(', '), comment:text,
+    type:'feedback', reaction:fbReaction||'', features:'', comment:text,
     mode:modeLabel(), ragas_completed:currentIdx, ragas_possible:ragaList.length,
     ragas_list:ragaList.slice(0,currentIdx).join(', '),
     seconds_per_raga:timePerRaga, time_spent_s:challengeElapsed,

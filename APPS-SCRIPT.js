@@ -52,7 +52,7 @@ function routeEvent(data) {
     },
     'feedback': {
       tab: 'feedback',
-      cols: ['timestamp','visitor_id','session_id','reaction','features','comment','mode','ragas_completed','ragas_possible','ragas_list','seconds_per_raga','time_spent_s','theme','play_count','device','browser','os','language','screen_size','timezone','connection','build']
+      cols: ['timestamp','visitor_id','session_id','reaction','features','comment','app_interest','mode','ragas_completed','ragas_possible','ragas_list','seconds_per_raga','time_spent_s','theme','play_count','device','browser','os','language','screen_size','timezone','connection','build']
     },
     'invite': {
       tab: 'invites',

@@ -297,6 +297,19 @@ html, body {
   transition:border-color 0.15s; }
 #fb-text::placeholder { color:rgba(255,255,255,0.28); }
 #fb-text:focus { outline:none; border-color:rgba(245,200,66,0.4); }
+.fb-app-q {
+  display:flex; flex-direction:column; gap:10px; }
+.fb-app-label {
+  font-family:var(--font); font-size:13px; color:rgba(255,255,255,0.5);
+  line-height:1.4; }
+.fb-app-opts {
+  display:flex; gap:8px; }
+.fb-app-opt {
+  flex:1; padding:10px 0; border:1px solid rgba(255,255,255,0.12); border-radius:10px;
+  background:transparent; color:rgba(255,255,255,0.5); font-family:var(--font);
+  font-size:13px; font-weight:500; cursor:pointer; transition:all 0.15s; }
+.fb-app-opt.picked {
+  background:rgba(245,200,66,0.12); border-color:var(--gold); color:var(--gold); }
 #fb-send-btn {
   width:100%; padding:16px; background:var(--gold); color:#000;
   border:none; border-radius:14px; font-family:var(--font);
@@ -504,6 +517,14 @@ html, body {
     <div class="fb-sheet-handle"></div>
     <p class="fb-sheet-title">Any thoughts?</p>
     <textarea id="fb-text" placeholder="Tell us what you think…"></textarea>
+    <div class="fb-app-q">
+      <span class="fb-app-label">Would you download a Karnatik music app with more games and practice tools?</span>
+      <div class="fb-app-opts">
+        <button class="fb-app-opt" data-v="yes" onclick="fbAppPick(this)">Yes</button>
+        <button class="fb-app-opt" data-v="maybe" onclick="fbAppPick(this)">Maybe</button>
+        <button class="fb-app-opt" data-v="no" onclick="fbAppPick(this)">No</button>
+      </div>
+    </div>
     <button id="fb-send-btn" onclick="fbSubmit()">Send feedback</button>
     <button class="fb-sheet-skip" onclick="fbSheetSkip()">Skip →</button>
   </div>
@@ -565,7 +586,7 @@ function modeLabel(){ return {easy:'Easy',notSoEasy:'Not So Easy',surpriseMe:'Su
 // ── Feedback analytics endpoint (optional Google Sheets logger) ──
 // Setup: Extensions → Apps Script → paste doPost handler → Deploy as web app (Anyone) → paste URL here
 const SHEETS_ENDPOINT = 'https://script.google.com/macros/s/AKfycbxSjYYT7WnYYm5OII1UdeRjMAfArp8MDVJJ_DU6vSW_t5_80LfY7syyezI4iNxoV17b/exec';
-const APP_BUILD = '20260407-b56'; // bump this on every push so Sheets confirms which build you're testing
+const APP_BUILD = '20260407-b57'; // bump this on every push so Sheets confirms which build you're testing
 const CLOUDINARY_CLOUD = 'dfstch1ag';
 const CLOUDINARY_PRESET = 'forRagaChallange';
 const CLOUDINARY_UPLOAD_URL = 'https://api.cloudinary.com/v1_1/dfstch1ag/video/upload';
@@ -2042,6 +2063,8 @@ function fbReact(v){
 
 function fbSheetOpen(){
   document.getElementById('fb-text').value='';
+  document.querySelectorAll('.fb-app-opt').forEach(b=>b.classList.remove('picked'));
+  fbAppInterest='';
   document.getElementById('fb-sheet-backdrop').classList.add('open');
   document.getElementById('fb-sheet').classList.add('open');
 }
@@ -2065,11 +2088,18 @@ function privacyClose(){
   document.getElementById('privacy-sheet').classList.remove('open');
 }
 
+let fbAppInterest='';
+function fbAppPick(el){
+  document.querySelectorAll('.fb-app-opt').forEach(b=>b.classList.remove('picked'));
+  el.classList.add('picked');
+  fbAppInterest=el.dataset.v;
+}
+
 function fbSubmit(){
   const text=(document.getElementById('fb-text')?.value||'').trim();
   trackStage('feedback_given');
   logEvent({
-    type:'feedback', reaction:fbReaction||'', features:'', comment:text,
+    type:'feedback', reaction:fbReaction||'', features:'', comment:text, app_interest:fbAppInterest,
     mode:modeLabel(), ragas_completed:currentIdx, ragas_possible:ragaList.length,
     ragas_list:ragaList.slice(0,currentIdx).join(', '),
     seconds_per_raga:timePerRaga, time_spent_s:challengeElapsed,

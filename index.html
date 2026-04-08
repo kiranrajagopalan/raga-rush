@@ -586,7 +586,7 @@ function modeLabel(){ return {easy:'Easy',notSoEasy:'Not So Easy',surpriseMe:'Su
 // ── Feedback analytics endpoint (optional Google Sheets logger) ──
 // Setup: Extensions → Apps Script → paste doPost handler → Deploy as web app (Anyone) → paste URL here
 const SHEETS_ENDPOINT = 'https://script.google.com/macros/s/AKfycbxSjYYT7WnYYm5OII1UdeRjMAfArp8MDVJJ_DU6vSW_t5_80LfY7syyezI4iNxoV17b/exec';
-const APP_BUILD = '20260407-b58'; // bump this on every push so Sheets confirms which build you're testing
+const APP_BUILD = '20260408-b59'; // bump this on every push so Sheets confirms which build you're testing
 const CLOUDINARY_CLOUD = 'dfstch1ag';
 const CLOUDINARY_PRESET = 'forRagaChallange';
 const CLOUDINARY_UPLOAD_URL = 'https://api.cloudinary.com/v1_1/dfstch1ag/video/upload';
@@ -641,7 +641,8 @@ function _detectEnv(){
 function logEvent(payload, immediate){
   if(!SHEETS_ENDPOINT) return;
   const evt={
-    ...payload, visitor_id:visitorId, session_id:sessionId,
+    ...payload, _token:'rr_58x_karnatricks',
+    visitor_id:visitorId, session_id:sessionId,
     timestamp:new Date().toISOString(), build:APP_BUILD,
     ..._detectEnv()
   };
@@ -656,7 +657,7 @@ function logEvent(payload, immediate){
 function flushEvents(){
   if(!SHEETS_ENDPOINT||!pendingEvents.length) return;
   const batch=[...pendingEvents]; pendingEvents=[];
-  try{ fetch(SHEETS_ENDPOINT,{method:'POST',headers:{'Content-Type':'text/plain'},body:JSON.stringify({type:'batch',events:batch})}); }catch(e){ console.warn('[flushEvents]',e.message); }
+  try{ fetch(SHEETS_ENDPOINT,{method:'POST',headers:{'Content-Type':'text/plain'},body:JSON.stringify({type:'batch',_token:'rr_58x_karnatricks',events:batch})}); }catch(e){ console.warn('[flushEvents]',e.message); }
 }
 
 function trackStage(newStage, extra){

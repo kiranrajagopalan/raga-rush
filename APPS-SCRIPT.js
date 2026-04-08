@@ -18,17 +18,35 @@
 //   visits, funnel, sessions, feedback, invites, errors, daily_summary
 // ══════════════════════════════════════════════════════════════
 
+const APP_TOKEN = 'rr_58x_karnatricks';
+
 function doPost(e) {
   try {
     const data = JSON.parse(e.postData.contents);
 
+    // Validate app token — stops drive-by abuse from bots/scrapers
+    if (data._token !== APP_TOKEN) {
+      return ContentService.createTextOutput('unauthorized');
+    }
+
+    // Rate limiting — max 100 events per visitor per hour
+    const vid = data.visitor_id || (data.events && data.events[0] && data.events[0].visitor_id) || 'anon';
+    const cache = CacheService.getScriptCache();
+    const rateKey = 'rate_' + vid;
+    const count = Number(cache.get(rateKey) || 0);
+    if (count > 100) {
+      return ContentService.createTextOutput('rate limited');
+    }
+
     // Handle batched events
     if (data.type === 'batch' && Array.isArray(data.events)) {
       data.events.forEach(evt => routeEvent(evt));
+      cache.put(rateKey, String(count + data.events.length), 3600);
       return ContentService.createTextOutput('ok');
     }
 
     routeEvent(data);
+    cache.put(rateKey, String(count + 1), 3600);
     return ContentService.createTextOutput('ok');
   } catch (err) {
     return ContentService.createTextOutput('error: ' + err.message);
@@ -69,9 +87,12 @@ function routeEvent(data) {
 
   const sheet = getOrCreateTab(config.tab, config.cols);
   const row = config.cols.map(col => {
-    const val = data[col];
+    let val = data[col];
     if (val === undefined || val === null) return '';
     if (typeof val === 'boolean') return val ? 'TRUE' : 'FALSE';
+    val = String(val);
+    // Prevent formula injection — prefix dangerous first characters
+    if (/^[=+\-@]/.test(val)) val = "'" + val;
     return val;
   });
   sheet.appendRow(row);
@@ -230,6 +251,11 @@ function computeDailySummary() {
 function doGet(e) {
   const action = (e && e.parameter && e.parameter.action) || '';
   if (action === 'stats') {
+    // Server-side auth — reject if admin key missing
+    if (!e.parameter.admin || e.parameter.admin !== '7') {
+      return ContentService.createTextOutput(JSON.stringify({error:'unauthorized'}))
+        .setMimeType(ContentService.MimeType.JSON);
+    }
     return getCumulativeStats();
   }
   return ContentService.createTextOutput('Raga Rush Analytics v2');

@@ -115,7 +115,7 @@ function esc(s) {
 
 async function loadDashboard() {
   try {
-    const resp = await fetch(STATS_ENDPOINT + '?action=stats');
+    const resp = await fetch(STATS_ENDPOINT + '?action=stats&admin=7');
     if (!resp.ok) throw new Error('HTTP ' + resp.status);
     const stats = await resp.json();
     renderDashboard(stats);

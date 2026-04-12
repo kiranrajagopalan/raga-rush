@@ -586,7 +586,7 @@ function modeLabel(){ return {easy:'Easy',notSoEasy:'Not So Easy',surpriseMe:'Su
 // ── Feedback analytics endpoint (optional Google Sheets logger) ──
 // Setup: Extensions → Apps Script → paste doPost handler → Deploy as web app (Anyone) → paste URL here
 const SHEETS_ENDPOINT = 'https://script.google.com/macros/s/AKfycbwC3cRFGo2uDur_7LPfUx-HO9h7I2ML4H3x_nPfrIloQfoZjxYNhzFjAQcaR05ZM3dq/exec';
-const APP_BUILD = '20260408-b59'; // bump this on every push so Sheets confirms which build you're testing
+const APP_BUILD = '20260412-b60'; // bump this on every push so Sheets confirms which build you're testing
 const CLOUDINARY_CLOUD = 'dfstch1ag';
 const CLOUDINARY_PRESET = 'forRagaChallange';
 const CLOUDINARY_UPLOAD_URL = 'https://api.cloudinary.com/v1_1/dfstch1ag/video/upload';
@@ -834,6 +834,9 @@ function setupChallenge(){
   shuffle(pool);
   ragaCount=difficulty==='surpriseMe'?5:ragaCount;
   ragaList=pool.slice(0,ragaCount); currentIdx=0;
+  // ?ragas=Mohana,Bhairavi,Kalyāni → override with specific ragas in order (for demos)
+  const _demoRagas=new URLSearchParams(location.search).get('ragas');
+  if(_demoRagas){ ragaList=_demoRagas.split(',').map(r=>r.trim()); ragaCount=ragaList.length; }
   document.getElementById('raga-display').classList.remove('visible');
   document.getElementById('raga-name').textContent='—';
   document.getElementById('countdown-num').textContent='—';
